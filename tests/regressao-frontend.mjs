@@ -9,10 +9,13 @@ assert.match(html, /assets\/logo-sorri-simbolo\.png/, 'cabeçalho deve exibir o 
 assert.match(html, /assets\/logo-sorri-50-anos\.png/, 'cabeçalho deve controlar o elemento de aniversário separadamente');
 assert.match(html, /#reader:not\(:empty\)\{height:clamp\(185px,28vh,230px\)/, 'viewport do scanner deve permanecer compacto');
 assert.match(html, /\.search button\{flex:0 0 auto;min-width:115px/, 'busca mobile deve manter botão acessível na mesma linha');
+assert.match(html, /\.decor\{position:fixed;z-index:0;pointer-events:none/, 'decoração deve permanecer em camada própria, atrás da interface');
+assert.match(html, /\.decor-bottom\{width:190px;height:190px;right:-105px;bottom:-100px/, 'arco inferior deve ficar no canto direito');
+assert.match(html, /\.meta\{margin-top:9px;[^}]*flex-wrap:nowrap/, 'faixa de operação não deve quebrar precocemente');
 const helpers = script.slice(0, script.indexOf("$('start').onclick"));
-const context = { console, localStorage: { getItem: () => null, setItem: () => {} }, document: { getElementById: () => null } };
+const context = { console, URL, localStorage: { getItem: () => null, setItem: () => {} }, document: { getElementById: () => null } };
 vm.createContext(context);
-vm.runInContext(`${helpers}; globalThis.exports_={APP_VERSION,CACHE_KEY,ID_KEY,norm,indiceCompativel,filtrarIndiceLocal,buscarComFallback};`, context);
+vm.runInContext(`${helpers}; globalThis.exports_={APP_VERSION,CACHE_KEY,ID_KEY,norm,normalizarQrLido,indiceCompativel,filtrarIndiceLocal,buscarComFallback};`, context);
 const app = context.exports_;
 
 const indice = {
@@ -23,10 +26,10 @@ const indice = {
     { idPessoa: 'P3', nome: 'Cadastro Alternativo', nomeCracha: 'Crachá Árvore', nomeExibicao: 'Crachá Árvore' },
     { idPessoa: 'P2', nome: 'Nome Principal', nomeCracha: '', nomeExibicao: 'Nome Principal' }
   ],
-  inscricaoParaPessoa: {}
+  inscricaoParaPessoa: { '75817561': { idPessoa: 'P1', categoria: '' } }
 };
 
-assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.3');
+assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.4');
 assert.equal(app.ID_KEY, 'simposio50.identidade', 'identidade do operador deve permanecer em chave separada');
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Diego Bento').map(p => p.idPessoa), ['P1']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'diego bento').map(p => p.idPessoa), ['P1']);
@@ -36,6 +39,11 @@ assert.deepEqual(app.filtrarIndiceLocal(indice, 'Bento').map(p => p.idPessoa), [
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Cracha Arvore').map(p => p.idPessoa), ['P3']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Nome Principal').map(p => p.idPessoa), ['P2']);
 assert.equal(app.norm('  Árvore  CAFÉ '), 'ARVORE CAFE', 'normalização deve ignorar acentos e espaços extras');
+assert.equal(app.normalizarQrLido('  00012345\n'), '00012345', 'QR numérico simples deve preservar zeros à esquerda');
+assert.equal(app.normalizarQrLido('https://e3.gl/99a0046e75817561?n=Ortopedia'), '75817561', 'URL QR confirmada deve extrair somente a inscrição');
+assert.equal(app.normalizarQrLido('https://outro.exemplo/99a0046e75817561'), 'https://outro.exemplo/99a0046e75817561', 'URL não reconhecida não pode ser convertida arbitrariamente');
+assert.equal(app.normalizarQrLido('codigo-invalido'), 'codigo-invalido', 'payload inválido deve seguir para o erro QR_NAO_LOCALIZADO');
+assert.ok(indice.inscricaoParaPessoa[app.normalizarQrLido('https://e3.gl/99a0046e75817561?n=Ortopedia')], 'QR URL e índice local devem resolver a mesma inscrição');
 
 assert.equal(app.indiceCompativel(indice, '1'), true);
 assert.equal(app.indiceCompativel({ ...indice, appVersion: '2026.09.11.1' }, '1'), false, 'cache de frontend anterior deve ser rejeitado');
