@@ -10,8 +10,10 @@ assert.match(html, /assets\/logo-sorri-50-anos\.png/, 'cabeçalho deve controlar
 assert.match(html, /#reader:not\(:empty\)\{height:clamp\(185px,28vh,230px\)/, 'viewport do scanner deve permanecer compacto');
 assert.match(html, /\.search button\{flex:0 0 auto;min-width:115px/, 'busca mobile deve manter botão acessível na mesma linha');
 assert.match(html, /\.decor\{position:fixed;z-index:0;pointer-events:none/, 'decoração deve permanecer em camada própria, atrás da interface');
-assert.match(html, /\.decor-top\{width:210px;height:210px;right:-64px;top:-96px/, 'arco superior deve alcançar o canto direito');
-assert.match(html, /\.decor-bottom\{width:205px;height:205px;left:-112px;bottom:-108px/, 'arco inferior deve ficar no canto esquerdo');
+assert.match(html, /\.decor-top\{width:220px;height:220px;right:-68px;top:-102px/, 'arco superior deve alcançar o canto direito');
+assert.match(html, /\.decor-top-secondary\{width:126px;height:126px;right:-48px;top:22px/, 'arco fino complementar deve compor o canto superior direito');
+assert.match(html, /\.decor-bottom\{width:222px;height:222px;left:-120px;bottom:-126px/, 'arco inferior deve ficar no canto esquerdo');
+assert.match(html, /\.decor-bottom-secondary\{width:144px;height:144px;left:-70px;bottom:-72px/, 'arco fino complementar deve compor o canto inferior esquerdo');
 assert.match(html, /\.meta\{margin-top:9px;[^}]*flex-wrap:nowrap/, 'faixa de operação não deve quebrar precocemente');
 assert.match(html, /\.operator-wrap\{display:block!important;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis/, 'operador longo deve truncar sem sobrepor a data');
 const helpers = script.slice(0, script.indexOf("$('start').onclick"));
@@ -31,7 +33,7 @@ const indice = {
   inscricaoParaPessoa: { '75817561': { idPessoa: 'P1', categoria: '' } }
 };
 
-assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.5');
+assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.7');
 assert.equal(app.ID_KEY, 'simposio50.identidade', 'identidade do operador deve permanecer em chave separada');
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Diego Bento').map(p => p.idPessoa), ['P1']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'diego bento').map(p => p.idPessoa), ['P1']);
