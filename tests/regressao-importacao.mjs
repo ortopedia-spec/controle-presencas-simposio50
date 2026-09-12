@@ -4,6 +4,7 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../apps-script/Importacao.gs', import.meta.url), 'utf8');
 const migracao = fs.readFileSync(new URL('../apps-script/Migracao.gs', import.meta.url), 'utf8');
+const consulta = fs.readFileSync(new URL('../apps-script/Consulta.gs', import.meta.url), 'utf8');
 let scriptToken = '';
 const context = {
   texto_: value => value == null ? '' : String(value).trim(),
@@ -46,8 +47,15 @@ assert.match(source, /payload\.arquivoDataHora\|\|payload\.dataHoraArquivo/, 'ar
 assert.match(source, /arquivo: texto_\(payload\.arquivo\)/, 'resposta deve preservar arquivo para PowerShell');
 const cache = fs.readFileSync(new URL('../apps-script/Cache.gs', import.meta.url), 'utf8');
 assert.match(cache, /const CACHE_BUCKETS = 32/, 'cache deve usar buckets');
+assert.match(cache, /const CACHE_SCHEMA_VERSION = '6'/, 'cache deve versionar o formato serializado');
 assert.match(cache, /invalidarCacheDaVersao_\(anterior\)/, 'versão anterior deve ser invalidada');
-vm.runInContext(`${cache}; globalThis.cacheExports_={nomeCrachaParaCache_};`, context);
+vm.runInContext(`${cache}; globalThis.cacheExports_={nomeCrachaParaCache_,chaveCache_,textoBuscaPessoa_};`, context);
 assert.equal(context.cacheExports_.nomeCrachaParaCache_('', ['Diego Bento']), 'Diego Bento', 'cache deve usar o único nome de crachá de origem');
+assert.equal(context.cacheExports_.nomeCrachaParaCache_('Cadastro Institucional', ['Diego Bento']), 'Diego Bento', 'origem humana única deve ter prioridade apenas na representação em cache');
 assert.equal(context.cacheExports_.nomeCrachaParaCache_('', ['Diego Bento', 'João Silva']), '', 'cache não deve escolher nome em conflito');
+assert.equal(context.cacheExports_.chaveCache_('1', 'META', '0'), 'PRESENCAS_6_1_META_0', 'mudança de esquema deve isolar buckets legados');
+assert.match(context.cacheExports_.textoBuscaPessoa_('Cadastro Institucional', '', 'Bento', ['Diego Bento']), /DIEGO BENTO/, 'aliases de crachá de origem devem compor a busca sem alterar o nome exibido');
+vm.runInContext(`${consulta}; globalThis.consultaExports_={nomeExibicaoPesquisa_};`, context);
+assert.equal(context.consultaExports_.nomeExibicaoPesquisa_({ nomeExibicao: 'Cadastro Institucional', nomesCrachaOrigem: ['Diego Bento', 'Outro Crachá'] }, ['DIEGO', 'BENTO']), 'Diego Bento', 'consulta exata deve exibir o alias correspondente');
+assert.equal(context.consultaExports_.nomeExibicaoPesquisa_({ nomeExibicao: 'Cadastro Institucional', nomesCrachaOrigem: ['Diego Bento', 'Outro Crachá'] }, ['DIEGO']), 'Diego Bento', 'consulta parcial com alias único deve exibir o alias humano');
 console.log('OK: regressões de importação e cache aprovadas');
