@@ -6,7 +6,7 @@ function registrarPresenca_(payload) {
   if (!operador || !dispositivo) throw criarErro_('IDENTIFICACAO_OPERACIONAL_OBRIGATORIA', 'Informe operador e dispositivo.');
   let pessoa, numero = '';
   if (origem === 'QR') { numero = normalizarNumeroInscricao_(payload.numeroInscricao); pessoa = buscarPorInscricao_(numero); }
-  else { const p = obterIndiceInterno_().pessoas[texto_(payload.idPessoa)]; pessoa = sanitizarPessoa_(p); }
+  else { pessoa = sanitizarPessoa_(obterPessoaCache_(texto_(payload.idPessoa))); }
   const lock = LockService.getScriptLock();
   try {
     if (!lock.tryLock(20000)) throw criarErro_('SISTEMA_OCUPADO', 'Há outro registro em andamento. Tente novamente.');

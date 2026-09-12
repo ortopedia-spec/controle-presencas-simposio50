@@ -1,8 +1,8 @@
 function buscarPorInscricao_(numeroInscricao) {
   const numero = normalizarNumeroInscricao_(numeroInscricao); if (!numero) throw criarErro_('INSCRICAO_OBRIGATORIA', 'Informe o número de inscrição.');
-  const indice = obterIndiceInterno_(), match = indice.inscricaoParaPessoa[numero];
+  const match = obterQrCache_(numero);
   if (!match) throw criarErro_('QR_NAO_LOCALIZADO', 'QR não localizado.');
-  return sanitizarPessoa_(indice.pessoas[match.idPessoa], numero, match.categoria);
+  return sanitizarPessoa_(obterPessoaCache_(match.idPessoa), numero, match.categoria);
 }
 function buscarParticipantes_(termo) {
   const q = normalizarComparacao_(termo); if (q.length < 2) throw criarErro_('BUSCA_CURTA', 'Digite ao menos 2 caracteres.');

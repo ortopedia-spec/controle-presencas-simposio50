@@ -1,5 +1,5 @@
 function importarCredenciamento_(payload) {
-  const tokenEsperado = PropertiesService.getScriptProperties().getProperty('TOKEN_IMPORTACAO');
+  const tokenEsperado = obterTokenImportacao_();
   const tokenRecebido = texto_(payload.tokenImportacao || payload.TOKEN_IMPORTACAO || payload.token);
   if (!tokenEsperado || tokenRecebido !== tokenEsperado) throw criarErro_('NAO_AUTORIZADO', 'Token de importação inválido.');
   const registros = Array.isArray(payload.registros) ? payload.registros : Array.isArray(payload.inscricoes) ? payload.inscricoes : Array.isArray(payload.dados) ? payload.dados : [];
@@ -26,7 +26,7 @@ function importarCredenciamento_(payload) {
     let novasInscricoes = 0, pessoasNovas = 0, pessoasAtualizadas = 0, proximo = proximoIdPessoa_(pessoas);
     const linhasInscricao = [], alteradas = {};
     registros.forEach(function(registro) {
-      const r = normalizarRegistroImportado_(registro);
+      const r = normalizarRegistroImportado_(registro, payload);
       if (!r.numeroInscricao || porInscricao[r.numeroInscricao]) return; // unit of import deduplication
       let pessoa = localizarPessoaConservadora_(r, porCpf, porEmail, porNome, porCrachaData);
       if (!pessoa) {
@@ -35,8 +35,8 @@ function importarCredenciamento_(payload) {
         if (r.cpf) porCpf[r.cpf] = pessoa; if (r.email) porEmail[r.email] = pessoa;
         if (pessoa.NOME_NORMALIZADO) { porNome[pessoa.NOME_NORMALIZADO] = porNome[pessoa.NOME_NORMALIZADO] || []; porNome[pessoa.NOME_NORMALIZADO].push(pessoa); }
       } else if (completarPessoa_(pessoa, r)) { alteradas[pessoa.ID_PESSOA] = pessoa; }
-      const numeros = texto_(pessoa.NUMEROS_INSCRICAO).split(/[;,\s]+/).filter(Boolean);
-      numeros.push(r.numeroInscricao); pessoa.NUMEROS_INSCRICAO = numeros.join(', '); pessoa.QTD_INSCRICOES = numeros.length; pessoa.ULTIMA_ATUALIZACAO = agoraTexto_();
+      const numeros = numerosInscricaoUnicos_(texto_(pessoa.NUMEROS_INSCRICAO).split(/[|,;\s]+/).filter(Boolean).concat([r.numeroInscricao]));
+      pessoa.NUMEROS_INSCRICAO = numeros.join('|'); pessoa.QTD_INSCRICOES = numeros.length; pessoa.ULTIMA_ATUALIZACAO = agoraTexto_();
       alteradas[pessoa.ID_PESSOA] = pessoa;
       linhasInscricao.push([r.numeroInscricao,pessoa.ID_PESSOA,r.idOrigem,r.nome,r.nomeCracha,r.email,r.cpf,r.categoria,r.dataInscricao,r.horaInscricao,r.arquivoOrigem,agoraTexto_()]);
       porInscricao[r.numeroInscricao] = true; novasInscricoes++;
@@ -48,14 +48,14 @@ function importarCredenciamento_(payload) {
     pessoasAtualizadas = Object.keys(alteradas).filter(id => alteradas[id].__linha).length;
     const versao = novasInscricoes ? incrementarBaseVersion_() : obterBaseVersion_();
     registrarImportacao_(payload, registros.length, novasInscricoes, pessoasNovas, pessoasAtualizadas, 'SUCESSO', 'Importação concluída. Base ' + versao + '.');
-    return { registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
+    return { arquivo: texto_(payload.arquivo), registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
   } catch (erro) {
     registrarImportacaoSeguro_(payload, registros.length, 0, 0, 0, 'ERRO', erro.message);
     throw erro;
   } finally { if (lock.hasLock()) lock.releaseLock(); }
 }
 
-function normalizarRegistroImportado_(r) { return { numeroInscricao: normalizarNumeroInscricao_(campo_(r,['NUMERO_INSCRICAO','numeroInscricao','inscricao'])), idOrigem: texto_(campo_(r,['ID_ORIGEM','idOrigem'])), nome: texto_(campo_(r,['NOME_ORIGEM','NOME','nome'])), nomeCracha: texto_(campo_(r,['NOME_CRACHA_ORIGEM','NOME_CRACHA','nomeCracha'])), email: normalizarEmail_(campo_(r,['EMAIL_ORIGEM','EMAIL','email'])), cpf: somenteDigitos_(campo_(r,['CPF_ORIGEM','CPF','cpf'])), telefone: texto_(campo_(r,['TELEFONE','telefone'])), categoria: texto_(campo_(r,['CATEGORIA','categoria'])), dataInscricao: texto_(campo_(r,['DATA_INSCRICAO','dataInscricao'])), horaInscricao: texto_(campo_(r,['HORA_INSCRICAO','horaInscricao'])), arquivoOrigem: texto_(campo_(r,['ARQUIVO_ORIGEM','arquivoOrigem','arquivo'])) }; }
+function normalizarRegistroImportado_(r,payload) { return { numeroInscricao: normalizarNumeroInscricao_(campo_(r,['numeroInscricao','NUMERO_INSCRICAO','inscricao'])), idOrigem: texto_(campo_(r,['idOrigem','ID_ORIGEM'])), nome: texto_(campo_(r,['nome','NOME_ORIGEM','NOME'])), nomeCracha: texto_(campo_(r,['nomeCracha','NOME_CRACHA_ORIGEM','NOME_CRACHA'])), email: normalizarEmail_(campo_(r,['email','EMAIL_ORIGEM','EMAIL'])), cpf: somenteDigitos_(campo_(r,['cpf','CPF_ORIGEM','CPF'])), telefone: texto_(campo_(r,['telefone','TELEFONE'])), categoria: texto_(campo_(r,['categoria','CATEGORIA'])), dataInscricao: texto_(campo_(r,['dataInscricao','DATA_INSCRICAO'])), horaInscricao: texto_(campo_(r,['horaInscricao','HORA_INSCRICAO'])), arquivoOrigem: texto_(campo_(r,['arquivoOrigem','ARQUIVO_ORIGEM','arquivo']) || payload.arquivo) }; }
 function campo_(obj, nomes) { for (let i=0;i<nomes.length;i++) if (Object.prototype.hasOwnProperty.call(obj, nomes[i])) return obj[nomes[i]]; return ''; }
 function localizarPessoaConservadora_(r, porCpf, porEmail, porNome, porCrachaData) { if (r.cpf && porCpf[r.cpf]) return porCpf[r.cpf]; if (r.email && porEmail[r.email]) return porEmail[r.email]; const chave=chaveCrachaData_(r.nomeCracha,r.dataInscricao,r.horaInscricao); if (chave && porCrachaData[chave]) return porCrachaData[chave]; const nomes=porNome[normalizarComparacao_(r.nome)] || []; return nomes.length === 1 ? nomes[0] : null; }
 function completarPessoa_(p,r) { let mudou=false; [['NOME','nome'],['NOME_CRACHA','nomeCracha'],['EMAIL','email'],['CPF','cpf'],['TELEFONE','telefone']].forEach(function(par){if(!texto_(p[par[0]]) && r[par[1]]) {p[par[0]]=r[par[1]];mudou=true;}}); if (!texto_(p.NOME_NORMALIZADO) && texto_(p.NOME)) {p.NOME_NORMALIZADO=normalizarComparacao_(p.NOME);mudou=true;} return mudou; }
@@ -64,7 +64,10 @@ function proximoIdPessoa_(pessoas) { return pessoas.reduce((m,p) => Math.max(m, 
 function chaveCrachaData_(nome,data,hora) { const n=normalizarComparacao_(nome); return n && texto_(data) && texto_(hora) ? n+'|'+texto_(data)+'|'+texto_(hora) : ''; }
 function somenteDigitos_(v) { return texto_(v).replace(/\D/g,''); }
 function normalizarEmail_(v) { return texto_(v).toLowerCase(); }
+function numerosInscricaoUnicos_(numeros) { const vistos={}; return numeros.map(normalizarNumeroInscricao_).filter(function(n){if(!n||vistos[n])return false;vistos[n]=true;return true;}); }
 function agoraTexto_() { return Utilities.formatDate(new Date(),CONFIG.TIMEZONE,'yyyy-MM-dd HH:mm:ss'); }
 function validarCabecalho_(atual, esperado, aba) { if (esperado.some((h,i) => atual[i] !== h)) throw criarErro_('CABECALHO_INVALIDO','Cabeçalho inválido na aba '+aba+'.'); }
-function registrarImportacao_(payload,lidas,novas,pessoasNovas,pessoasAtualizadas,status,mensagem) { const t=lerTabela_(CONFIG.SHEETS.IMPORTACOES); validarCabecalho_(t.headers,CONFIG.HEADERS.IMPORTACOES,CONFIG.SHEETS.IMPORTACOES); t.sheet.getRange(t.sheet.getLastRow()+1,1,1,CONFIG.HEADERS.IMPORTACOES.length).setValues([['IM'+Utilities.getUuid(),texto_(payload.arquivo||payload.nomeArquivo),texto_(payload.dataHoraArquivo),agoraTexto_(),lidas,novas,pessoasNovas,pessoasAtualizadas,status,mensagem]]); }
+function obterTokenImportacao_() { const script=PropertiesService.getScriptProperties().getProperty('TOKEN_IMPORTACAO');return script||tokenImportacaoDaPlanilha_(); }
+function tokenImportacaoDaPlanilha_() { const valores=sheetObrigatoria_(CONFIG.SHEETS.CONFIG).getDataRange().getDisplayValues();for(let i=0;i<valores.length;i++)if(normalizarComparacao_(valores[i][0])==='TOKEN_IMPORTACAO')return texto_(valores[i].slice(1).find(texto_));return ''; }
+function registrarImportacao_(payload,lidas,novas,pessoasNovas,pessoasAtualizadas,status,mensagem) { const t=lerTabela_(CONFIG.SHEETS.IMPORTACOES); validarCabecalho_(t.headers,CONFIG.HEADERS.IMPORTACOES,CONFIG.SHEETS.IMPORTACOES); t.sheet.getRange(t.sheet.getLastRow()+1,1,1,CONFIG.HEADERS.IMPORTACOES.length).setValues([['IM'+Utilities.getUuid(),texto_(payload.arquivo||payload.nomeArquivo),texto_(payload.arquivoDataHora||payload.dataHoraArquivo),agoraTexto_(),lidas,novas,pessoasNovas,pessoasAtualizadas,status,mensagem]]); }
 function registrarImportacaoSeguro_() { try { registrarImportacao_.apply(null,arguments); } catch (_) {} }
