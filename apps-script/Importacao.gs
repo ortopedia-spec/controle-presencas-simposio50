@@ -12,7 +12,7 @@ function importarCredenciamento_(payload) {
     validarCabecalho_(inscricoes.headers, CONFIG.HEADERS.INSCRICOES, CONFIG.SHEETS.INSCRICOES);
     const pessoas = participantes.rows.map(function(p, i) { p.__linha = i + 2; return p; });
     const porInscricao = {}, porCpf = {}, porEmail = {}, porNome = {}, porCrachaData = {};
-    inscricoes.rows.forEach(function(r) { porInscricao[normalizarNumeroInscricao_(r.NUMERO_INSCRICAO)] = true; });
+    inscricoes.rows.forEach(function(r) { const numero=normalizarNumeroInscricao_(r.NUMERO_INSCRICAO);if(numero)porInscricao[numero]={idPessoa:texto_(r.ID_PESSOA)}; });
     pessoas.forEach(function(p) {
       const cpf = somenteDigitos_(p.CPF), email = normalizarEmail_(p.EMAIL), nome = normalizarComparacao_(p.NOME);
       if (cpf) porCpf[cpf] = p;
@@ -27,7 +27,13 @@ function importarCredenciamento_(payload) {
     const linhasInscricao = [], alteradas = {};
     registros.forEach(function(registro) {
       const r = normalizarRegistroImportado_(registro, payload);
-      if (!r.numeroInscricao || porInscricao[r.numeroInscricao]) return; // unit of import deduplication
+      if (!r.numeroInscricao) return;
+      if (porInscricao[r.numeroInscricao]) {
+        // Reimportação: pode enriquecer campos canônicos, mas não cria inscrição nem altera contadores.
+        const pessoaExistente=pessoas.find(p => texto_(p.ID_PESSOA)===porInscricao[r.numeroInscricao].idPessoa);
+        if (pessoaExistente && completarPessoa_(pessoaExistente,r)) { pessoaExistente.ULTIMA_ATUALIZACAO=agoraTexto_();alteradas[pessoaExistente.ID_PESSOA]=pessoaExistente; }
+        return;
+      }
       let pessoa = localizarPessoaConservadora_(r, porCpf, porEmail, porNome, porCrachaData);
       if (!pessoa) {
         pessoa = { ID_PESSOA: 'P' + String(proximo++).padStart(6, '0'), NOME: r.nome, NOME_NORMALIZADO: normalizarComparacao_(r.nome), NOME_CRACHA: r.nomeCracha, EMAIL: r.email, CPF: r.cpf, TELEFONE: r.telefone, NUMEROS_INSCRICAO: '', QTD_INSCRICOES: 0, PRIMEIRA_INSCRICAO_EM: r.dataInscricao + ' ' + r.horaInscricao, ULTIMA_ATUALIZACAO: '', __linha: 0 };
@@ -39,14 +45,14 @@ function importarCredenciamento_(payload) {
       pessoa.NUMEROS_INSCRICAO = numeros.join('|'); pessoa.QTD_INSCRICOES = numeros.length; pessoa.ULTIMA_ATUALIZACAO = agoraTexto_();
       alteradas[pessoa.ID_PESSOA] = pessoa;
       linhasInscricao.push([r.numeroInscricao,pessoa.ID_PESSOA,r.idOrigem,r.nome,r.nomeCracha,r.email,r.cpf,r.categoria,r.dataInscricao,r.horaInscricao,r.arquivoOrigem,agoraTexto_()]);
-      porInscricao[r.numeroInscricao] = true; novasInscricoes++;
+      porInscricao[r.numeroInscricao] = {idPessoa:pessoa.ID_PESSOA}; novasInscricoes++;
     });
     const novasPessoas = pessoas.filter(p => !p.__linha);
     if (novasPessoas.length) participantes.sheet.getRange(participantes.sheet.getLastRow()+1,1,novasPessoas.length,CONFIG.HEADERS.PARTICIPANTES.length).setValues(novasPessoas.map(linhaPessoa_));
     Object.keys(alteradas).forEach(function(id) { const p=alteradas[id]; if (p.__linha) participantes.sheet.getRange(p.__linha,1,1,CONFIG.HEADERS.PARTICIPANTES.length).setValues([linhaPessoa_(p)]); });
     if (linhasInscricao.length) inscricoes.sheet.getRange(inscricoes.sheet.getLastRow()+1,1,linhasInscricao.length,CONFIG.HEADERS.INSCRICOES.length).setValues(linhasInscricao);
     pessoasAtualizadas = Object.keys(alteradas).filter(id => alteradas[id].__linha).length;
-    const versao = novasInscricoes ? incrementarBaseVersion_() : obterBaseVersion_();
+    const versao = (novasInscricoes || Object.keys(alteradas).length) ? incrementarBaseVersion_() : obterBaseVersion_();
     registrarImportacao_(payload, registros.length, novasInscricoes, pessoasNovas, pessoasAtualizadas, 'SUCESSO', 'Importação concluída. Base ' + versao + '.');
     return { arquivo: texto_(payload.arquivo), registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
   } catch (erro) {
