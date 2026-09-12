@@ -5,6 +5,9 @@ import vm from 'node:vm';
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
 assert.ok(script, 'script do frontend deve existir');
+assert.match(html, /assets\/logo-sorri-50\.png/, 'cabeçalho deve exibir a identidade visual local');
+assert.match(html, /#reader:not\(:empty\)\{height:clamp\(190px,31vh,245px\)/, 'viewport do scanner deve permanecer compacto');
+assert.match(html, /\.search button\{flex:0 0 auto;min-width:94px\}/, 'busca mobile deve manter botão acessível na mesma linha');
 const helpers = script.slice(0, script.indexOf("$('start').onclick"));
 const context = { console, localStorage: { getItem: () => null, setItem: () => {} }, document: { getElementById: () => null } };
 vm.createContext(context);
@@ -22,7 +25,7 @@ const indice = {
   inscricaoParaPessoa: {}
 };
 
-assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.1');
+assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.2');
 assert.equal(app.ID_KEY, 'simposio50.identidade', 'identidade do operador deve permanecer em chave separada');
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Diego Bento').map(p => p.idPessoa), ['P1']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'diego bento').map(p => p.idPessoa), ['P1']);
