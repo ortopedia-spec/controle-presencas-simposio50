@@ -1,0 +1,9 @@
+{
+  "name": "Simpósio 50 Anos — Presenças",
+  "short_name": "Simpósio 50",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f8f7",
+  "theme_color": "#075d43",
+  "icons": []
+}
