@@ -34,15 +34,17 @@ class FakeTypedItem{
 }
 class FakeTextItem extends FakeTypedItem{constructor(id){super('TEXT',id);}}
 class FakeMultipleChoiceItem extends FakeTypedItem{constructor(id){super('MULTIPLE_CHOICE',id);}setChoiceValues(values){this.choices=values.slice();return this;}}
+class FakeCheckboxItem extends FakeTypedItem{constructor(id){super('CHECKBOX',id);}setChoiceValues(values){this.choices=values.slice();return this;}getChoices(){return this.choices.map(value=>({getValue:()=>value}));}}
 class FakeGenericItem{
   constructor(typed){this.typed=typed;} getTitle(){return this.typed.getTitle();} getType(){return this.typed.getType();} getId(){return this.typed.getId();}
   asTextItem(){if(this.getType()!=='TEXT')throw new TypeError('não é TextItem');return this.typed;}
   asMultipleChoiceItem(){if(this.getType()!=='MULTIPLE_CHOICE')throw new TypeError('não é MultipleChoiceItem');return this.typed;}
+  asCheckboxItem(){if(this.getType()!=='CHECKBOX')throw new TypeError('não é CheckboxItem');return this.typed;}
 }
 class FakeForm{
   constructor(id,title){this.id=id;this.title=title;this.items=[];this.destination='';this.destinationType=null;this.destinationIdReadsWithoutDestination=0;this.destinationVisibilityDelay=0;this.setDestinationCalls=0;this.failNextAddTextItem=false;this.failAfterSetDestination=false;}
   getId(){return this.id;} setTitle(value){this.title=value;return this;} setDescription(){return this;} setConfirmationMessage(){return this;} setCollectEmail(){return this;} setLimitOneResponsePerUser(){return this;} setPublishingSummary(){return this;} setShowLinkToRespondAgain(){return this;} setShuffleQuestions(){return this;}
-  addTextItem(){if(this.failNextAddTextItem){this.failNextAddTextItem=false;throw new Error('interrupção simulada após criar o Forms');}const item=new FakeTextItem(this.items.length+1);this.items.push(item);return item;} addMultipleChoiceItem(){const item=new FakeMultipleChoiceItem(this.items.length+1);this.items.push(item);return item;} getItems(){return this.items.map(item=>new FakeGenericItem(item));}
+  addTextItem(){if(this.failNextAddTextItem){this.failNextAddTextItem=false;throw new Error('interrupção simulada após criar o Forms');}const item=new FakeTextItem(this.items.length+1);this.items.push(item);return item;} addMultipleChoiceItem(){const item=new FakeMultipleChoiceItem(this.items.length+1);this.items.push(item);return item;} addCheckboxItem(){const item=new FakeCheckboxItem(this.items.length+1);this.items.push(item);return item;} getItems(){return this.items.map(item=>new FakeGenericItem(item));}
   getDestinationType(){if(this.failAfterSetDestination&&this.destination){this.failAfterSetDestination=false;throw new Error('falha simulada após setDestination');}if(!this.destination||this.destinationVisibilityDelay>0){if(this.destinationVisibilityDelay>0)this.destinationVisibilityDelay--;throw new Error('The form currently has no response destination.');}return this.destinationType;}
   getDestinationId(){if(!this.destination){this.destinationIdReadsWithoutDestination++;throw new Error('The form currently has no response destination.');}return this.destination;}
   setDestination(type,id){this.setDestinationCalls++;this.destinationType=type;this.destination=id;return this;} getPublishedUrl(){return 'https://docs.google.com/forms/d/e/'+this.id+'/viewform';} getEditUrl(){return 'https://docs.google.com/forms/d/'+this.id+'/edit';}
@@ -79,7 +81,7 @@ const scriptProperties={getProperty:key=>properties.get(key)||'',setProperty:(ke
 const lock={held:false,tryLock(){this.held=true;return true;},waitLock(){this.held=true;},hasLock(){return this.held;},releaseLock(){this.held=false;}};
 const forms=new Map(),triggers=[];let formSequence=0;
 const logs=[];
-const formApp={ItemType:{TEXT:'TEXT',MULTIPLE_CHOICE:'MULTIPLE_CHOICE'},DestinationType:{SPREADSHEET:'SPREADSHEET'},create:title=>{const form=new FakeForm('FORM-'+(++formSequence),title);forms.set(form.id,form);return form;},openById:id=>{if(!forms.has(id))throw new Error('form ausente');return forms.get(id);}};
+const formApp={ItemType:{TEXT:'TEXT',MULTIPLE_CHOICE:'MULTIPLE_CHOICE',CHECKBOX:'CHECKBOX'},DestinationType:{SPREADSHEET:'SPREADSHEET'},create:title=>{const form=new FakeForm('FORM-'+(++formSequence),title);forms.set(form.id,form);return form;},openById:id=>{if(!forms.has(id))throw new Error('form ausente');return forms.get(id);}};
 const scriptApp={EventType:{ON_FORM_SUBMIT:'ON_FORM_SUBMIT'},getProjectTriggers:()=>triggers.slice(),deleteTrigger:trigger=>triggers.splice(triggers.indexOf(trigger),1),newTrigger:handler=>({forForm:form=>({onFormSubmit:()=>({create:()=>{const trigger={getHandlerFunction:()=>handler,getEventType:()=>scriptApp.EventType.ON_FORM_SUBMIT,getTriggerSourceId:()=>form.id,getUniqueId:()=>`TRIGGER-${triggers.length+1}`};triggers.push(trigger);return trigger;}})})})};
 const context={
   SpreadsheetApp:{openById:()=>spreadsheet},
@@ -261,6 +263,10 @@ assert.equal(forms.size,1);
 assert.equal(parcialDuplicado.items.length,2,'verificação não pode criar outros campos ao detectar duplicidade');
 assert.equal(triggers.length,0);
 
+// As operações seguintes usam novamente um formulário íntegro com Categoria em Checkbox.
+limparFormularios();
+api.criarFormularioInscricaoLocal();
+
 const registro=(responseId,overrides={})=>({responseId,timestamp:'2026-09-13T10:00:00-03:00',nome:'Nova Pessoa',nomeCracha:'Nova',cpf:'11144477735',email:'nova@example.org',telefone:'14999999999',categoria:'Profissional',dataInscricao:'13/09/2026',horaInscricao:'10:00:00',...overrides});
 const nova=api.processarInscricaoLocal_(registro('R-NOVA'));
 assert.equal(nova.status,'PROCESSADA');
@@ -293,8 +299,9 @@ assert.notEqual(nomeAmbiguo.idPessoa,'P000004');
 assert.notEqual(nomeAmbiguo.idPessoa,'P000005');
 
 const countsBeforeInvalid={p:sheets.PARTICIPANTES.data.length,i:sheets.INSCRICOES.data.length,v:properties.get('BASE_VERSION')};
-assert.throws(()=>api.processarInscricaoLocal_(registro('R-CPF-INVALIDO',{cpf:'12345678900'})),/CPF inválido/);
-assert.deepEqual({p:sheets.PARTICIPANTES.data.length,i:sheets.INSCRICOES.data.length,v:properties.get('BASE_VERSION')},countsBeforeInvalid);
+const cpfInvalidoAceito=api.processarInscricaoLocal_(registro('R-CPF-INVALIDO',{cpf:'12345678900',email:''}));
+assert.equal(cpfInvalidoAceito.status,'PROCESSADA','CPF inválido deve ser aceito sem ser usado para associação');
+assert.deepEqual({p:sheets.PARTICIPANTES.data.length,i:sheets.INSCRICOES.data.length,v:Number(properties.get('BASE_VERSION'))},{p:countsBeforeInvalid.p+1,i:countsBeforeInvalid.i+1,v:Number(countsBeforeInvalid.v)+1});
 
 const concorrenteA=api.processarInscricaoLocal_(registro('R-CONC-A',{nome:'Concorrente',cpf:'39053344705',email:'concorrente@example.org'}));
 const participantesAntesB=sheets.PARTICIPANTES.data.length;

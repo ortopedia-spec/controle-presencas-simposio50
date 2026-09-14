@@ -21,7 +21,7 @@ function elemento() {
 function indice(version, device, suffix = 'A') {
   return {
     appVersion: '2026.09.14.3', baseVersion: version,
-    pessoas: [{ idPessoa: `P-${device}-${suffix}`, nome: `Pessoa ${device} ${suffix}`, nomeCracha: '', nomeExibicao: `Pessoa ${device} ${suffix}` }],
+    pessoas: [{ idPessoa: `P-${device}-${suffix}`, nome: `Pessoa ${device} ${suffix}`, nomeCracha: '', nomeExibicao: `Pessoa ${device} ${suffix}`, nomesBusca: [`Pessoa ${device} ${suffix}`] }],
     inscricaoParaPessoa: { [`7000000${device}`]: { idPessoa: `P-${device}-${suffix}`, categoria: 'TESTE' } }
   };
 }

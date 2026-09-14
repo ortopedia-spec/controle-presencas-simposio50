@@ -53,7 +53,7 @@ function indice(baseVersion, sufixo = 'A') {
   return {
     appVersion: '2026.09.14.3',
     baseVersion,
-    pessoas: [{ idPessoa: `P-${sufixo}`, nome: `Pessoa ${sufixo}`, nomeCracha: '', nomeExibicao: `Pessoa ${sufixo}` }],
+    pessoas: [{ idPessoa: `P-${sufixo}`, nome: `Pessoa ${sufixo}`, nomeCracha: '', nomeExibicao: `Pessoa ${sufixo}`, nomesBusca: [`Pessoa ${sufixo}`] }],
     inscricaoParaPessoa: { [`100${sufixo}`]: { idPessoa: `P-${sufixo}`, categoria: 'TESTE' } }
   };
 }
