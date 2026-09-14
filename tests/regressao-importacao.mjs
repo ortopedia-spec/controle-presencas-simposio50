@@ -15,7 +15,7 @@ const context = {
   normalizarComparacao_: value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim()
 };
 vm.createContext(context);
-vm.runInContext(`${source};${migracao}; globalThis.exports_={numerosInscricaoUnicos_,normalizarRegistroImportado_,obterTokenImportacao_,avaliarEnriquecimentoCanonico_,valorHumanoUnico_,completarPessoa_};`, context);
+vm.runInContext(`${source};${migracao}; globalThis.exports_={numerosInscricaoUnicos_,normalizarRegistroImportado_,obterTokenImportacao_,avaliarEnriquecimentoCanonico_,valorHumanoUnico_,completarPessoa_,numeroInscricaoEvent3Valido_,identidadeCompativelParaEnriquecimento_};`, context);
 const api = context.exports_;
 
 const oito = '75802661|75102633|75802664|75102635|75102634|75102636|75802662|75802663'.split('|');
@@ -27,6 +27,13 @@ const payload = { arquivo: 'ListaCredenciamento_15-09-2026_08-00-00.xlsx' };
 const registro = api.normalizarRegistroImportado_({ numeroInscricao: '75102633', idOrigem: '1', nome: 'Amanda', nomeCracha: 'Amanda Miranda', email: 'a@example.org', cpf: '123.456.789-00', telefone: '1', categoria: 'MANHA', dataInscricao: '15/09/2026', horaInscricao: '09:00:00' }, payload);
 assert.equal(registro.arquivoOrigem, payload.arquivo, 'arquivo do payload deve preencher ARQUIVO_ORIGEM');
 assert.equal(registro.numeroInscricao, '75102633');
+assert.equal(api.numeroInscricaoEvent3Valido_(''), false, 'inscrição Event3 vazia é inválida');
+assert.equal(api.numeroInscricaoEvent3Valido_('0'), false, 'inscrição Event3 zero é inválida');
+assert.equal(api.numeroInscricaoEvent3Valido_('000,00'), false, 'representação equivalente a zero é inválida');
+assert.equal(api.numeroInscricaoEvent3Valido_('75640337'), true, 'número Event3 válido deve ser preservado');
+assert.equal(api.identidadeCompativelParaEnriquecimento_({ NOME: 'Melissa Alonso', CPF: '', EMAIL: '' }, { nome: 'Simone Anselmo', cpf: '', email: '' }), false, 'número repetido não pode enriquecer pessoa de nome claramente diferente');
+assert.equal(api.identidadeCompativelParaEnriquecimento_({ NOME: 'Melissa Alonso', CPF: '123', EMAIL: 'melissa@example.org' }, { nome: 'Melissa A.', cpf: '123', email: 'melissa@example.org' }), true, 'variação compatível não deve bloquear enriquecimento seguro');
+assert.equal(api.identidadeCompativelParaEnriquecimento_({ NOME: 'Melissa Alonso', CPF: '123', EMAIL: 'melissa@example.org' }, { nome: 'Melissa A.', cpf: '456', email: 'melissa@example.org' }), false, 'CPF divergente bloqueia enriquecimento');
 assert.equal(api.obterTokenImportacao_(), 'token-da-config', 'CONFIG deve ser fallback de token');
 scriptToken = 'token-da-script-property';
 assert.equal(api.obterTokenImportacao_(), scriptToken, 'Script Properties deve ter prioridade sobre CONFIG');
@@ -42,6 +49,8 @@ const reimportada = { NOME: 'Ortopedia SORRI', NOME_CRACHA: '', EMAIL: '', CPF: 
 assert.equal(api.completarPessoa_(reimportada, { nomeCracha: 'Diego Bento', email: '', cpf: '', telefone: '' }), true);
 assert.equal(reimportada.NOME_CRACHA, 'Diego Bento'); assert.equal(reimportada.NUMEROS_INSCRICAO, oito.join('|')); assert.equal(reimportada.QTD_INSCRICOES, 8);
 assert.match(source, /if \(porInscricao\[r\.numeroInscricao\]\)/, 'QR existente deve seguir o caminho de enriquecimento');
+assert.match(source, /numeroInscricaoEvent3Valido_\(r\.numeroInscricao\)/, 'zero não pode entrar no índice de inscrições Event3');
+assert.match(source, /identidadeCompativelParaEnriquecimento_\(pessoaExistente,r\)/, 'reimportação exige compatibilidade antes de enriquecer pessoa existente');
 assert.match(source, /agoraTexto_\(\),'EVENT3'\]/, 'novas importações devem registrar origem EVENT3');
 assert.match(source, /aquecerCache=Boolean\(houveAlteracao\)/, 'somente importação com mudança efetiva deve aquecer o cache');
 assert.match(source, /if\(aquecerCache\)aquecerCacheBaseSeguro_\(\)/, 'aquecimento deve ocorrer após liberar o lock da importação');
@@ -53,6 +62,10 @@ assert.match(cache, /const CACHE_BUCKETS = 32/, 'cache deve usar buckets');
 assert.match(cache, /const CACHE_SCHEMA_VERSION = '6'/, 'cache deve versionar o formato serializado');
 assert.match(cache, /invalidarCacheDaVersao_\(anterior\)/, 'versão anterior deve ser invalidada');
 assert.match(cache, /function aquecerCacheBaseSeguro_\(\).*garantirCacheBase_\(\)/, 'aquecimento deve reutilizar a reconstrução segmentada protegida por ScriptLock');
+const auditoria = fs.readFileSync(new URL('../apps-script/AuditoriaImportacao.gs', import.meta.url), 'utf8');
+assert.match(auditoria, /function auditarAtualizacoesImportacaoEvent3_\(\)/, 'auditoria deve ser somente leitura');
+assert.match(auditoria, /P000056/, 'reparo deve ser estritamente limitado ao ID confirmado');
+assert.match(auditoria, /NOME_CRACHA/, 'reparo deve alterar somente o nome de crachá');
 vm.runInContext(`${cache}; globalThis.cacheExports_={nomeCrachaParaCache_,chaveCache_,textoBuscaPessoa_};`, context);
 assert.equal(context.cacheExports_.nomeCrachaParaCache_('', ['Diego Bento']), 'Diego Bento', 'cache deve usar o único nome de crachá de origem');
 assert.equal(context.cacheExports_.nomeCrachaParaCache_('Cadastro Institucional', ['Diego Bento']), 'Diego Bento', 'origem humana única deve ter prioridade apenas na representação em cache');

@@ -12,7 +12,7 @@ function importarCredenciamento_(payload) {
     validarCabecalho_(inscricoes.headers, CONFIG.HEADERS.INSCRICOES, CONFIG.SHEETS.INSCRICOES);
     const pessoas = participantes.rows.map(function(p, i) { p.__linha = i + 2; return p; });
     const porInscricao = {}, porCpf = {}, porEmail = {}, porNome = {}, porCrachaData = {};
-    inscricoes.rows.forEach(function(r) { const numero=normalizarNumeroInscricao_(r.NUMERO_INSCRICAO);if(numero)porInscricao[numero]={idPessoa:texto_(r.ID_PESSOA)}; });
+    inscricoes.rows.forEach(function(r) { const numero=normalizarNumeroInscricao_(r.NUMERO_INSCRICAO);if(numeroInscricaoEvent3Valido_(numero))porInscricao[numero]={idPessoa:texto_(r.ID_PESSOA)}; });
     pessoas.forEach(function(p) {
       const cpf = somenteDigitos_(p.CPF), email = normalizarEmail_(p.EMAIL), nome = normalizarComparacao_(p.NOME);
       if (cpf) porCpf[cpf] = p;
@@ -23,15 +23,16 @@ function importarCredenciamento_(payload) {
       const chave = chaveCrachaData_(i.NOME_CRACHA_ORIGEM, i.DATA_INSCRICAO, i.HORA_INSCRICAO);
       if (chave && pessoas.find(p => texto_(p.ID_PESSOA) === texto_(i.ID_PESSOA))) porCrachaData[chave] = pessoas.find(p => texto_(p.ID_PESSOA) === texto_(i.ID_PESSOA));
     });
-    let novasInscricoes = 0, pessoasNovas = 0, pessoasAtualizadas = 0, proximo = proximoIdPessoa_(pessoas);
+    let novasInscricoes = 0, pessoasNovas = 0, pessoasAtualizadas = 0, conflitosIdentidade = 0, proximo = proximoIdPessoa_(pessoas);
     const linhasInscricao = [], alteradas = {};
     registros.forEach(function(registro) {
       const r = normalizarRegistroImportado_(registro, payload);
-      if (!r.numeroInscricao) return;
+      if (!numeroInscricaoEvent3Valido_(r.numeroInscricao)) return;
       if (porInscricao[r.numeroInscricao]) {
         // Reimportação: pode enriquecer campos canônicos, mas não cria inscrição nem altera contadores.
         const pessoaExistente=pessoas.find(p => texto_(p.ID_PESSOA)===porInscricao[r.numeroInscricao].idPessoa);
-        if (pessoaExistente && completarPessoa_(pessoaExistente,r)) { pessoaExistente.ULTIMA_ATUALIZACAO=agoraTexto_();alteradas[pessoaExistente.ID_PESSOA]=pessoaExistente; }
+        if (pessoaExistente && identidadeCompativelParaEnriquecimento_(pessoaExistente,r)) { if(completarPessoa_(pessoaExistente,r)) { pessoaExistente.ULTIMA_ATUALIZACAO=agoraTexto_();alteradas[pessoaExistente.ID_PESSOA]=pessoaExistente; } }
+        else if(pessoaExistente){conflitosIdentidade++;console.warn('[IMPORTACAO_IDENTIDADE_DIVERGENTE] '+texto_(pessoaExistente.ID_PESSOA));}
         return;
       }
       let pessoa = localizarPessoaConservadora_(r, porCpf, porEmail, porNome, porCrachaData);
@@ -54,7 +55,7 @@ function importarCredenciamento_(payload) {
     pessoasAtualizadas = Object.keys(alteradas).filter(id => alteradas[id].__linha).length;
     const houveAlteracao=novasInscricoes || Object.keys(alteradas).length;
     const versao = houveAlteracao ? incrementarBaseVersion_() : obterBaseVersion_();
-    registrarImportacao_(payload, registros.length, novasInscricoes, pessoasNovas, pessoasAtualizadas, 'SUCESSO', 'Importação concluída. Base ' + versao + '.');
+    registrarImportacao_(payload, registros.length, novasInscricoes, pessoasNovas, pessoasAtualizadas, 'SUCESSO', 'Importação concluída. Base ' + versao + '. Conflitos de identidade ignorados: '+conflitosIdentidade+'.');
     resultado={ arquivo: texto_(payload.arquivo), registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
     aquecerCache=Boolean(houveAlteracao);
   } catch (erro) {
@@ -65,6 +66,9 @@ function importarCredenciamento_(payload) {
   return resultado;
 }
 
+function numeroInscricaoEvent3Valido_(valor) { const numero=normalizarNumeroInscricao_(valor);return !!numero&&!/^0+(?:[.,]0+)?$/.test(numero); }
+function nomesClaramenteDiferentes_(a,b) { const pa=normalizarComparacao_(a).split(' ').filter(Boolean),pb=normalizarComparacao_(b).split(' ').filter(Boolean);return !!pa.length&&!!pb.length&&!pa.some(function(parte){return pb.indexOf(parte)!==-1;}); }
+function identidadeCompativelParaEnriquecimento_(pessoa,registro) { const cpfPessoa=somenteDigitos_(pessoa.CPF),cpfRegistro=somenteDigitos_(registro.cpf),emailPessoa=normalizarEmail_(pessoa.EMAIL),emailRegistro=normalizarEmail_(registro.email);if(nomesClaramenteDiferentes_(pessoa.NOME,registro.nome))return false;if(cpfPessoa&&cpfRegistro&&cpfPessoa!==cpfRegistro)return false;if(emailPessoa&&emailRegistro&&emailPessoa!==emailRegistro)return false;return true; }
 function normalizarRegistroImportado_(r,payload) { return { numeroInscricao: normalizarNumeroInscricao_(campo_(r,['numeroInscricao','NUMERO_INSCRICAO','inscricao'])), idOrigem: texto_(campo_(r,['idOrigem','ID_ORIGEM'])), nome: texto_(campo_(r,['nome','NOME_ORIGEM','NOME'])), nomeCracha: texto_(campo_(r,['nomeCracha','NOME_CRACHA_ORIGEM','NOME_CRACHA'])), email: normalizarEmail_(campo_(r,['email','EMAIL_ORIGEM','EMAIL'])), cpf: somenteDigitos_(campo_(r,['cpf','CPF_ORIGEM','CPF'])), telefone: texto_(campo_(r,['telefone','TELEFONE'])), categoria: texto_(campo_(r,['categoria','CATEGORIA'])), dataInscricao: texto_(campo_(r,['dataInscricao','DATA_INSCRICAO'])), horaInscricao: texto_(campo_(r,['horaInscricao','HORA_INSCRICAO'])), arquivoOrigem: texto_(campo_(r,['arquivoOrigem','ARQUIVO_ORIGEM','arquivo']) || payload.arquivo) }; }
 function campo_(obj, nomes) { for (let i=0;i<nomes.length;i++) if (Object.prototype.hasOwnProperty.call(obj, nomes[i])) return obj[nomes[i]]; return ''; }
 function localizarPessoaConservadora_(r, porCpf, porEmail, porNome, porCrachaData) { if (r.cpf && porCpf[r.cpf]) return porCpf[r.cpf]; if (r.email && porEmail[r.email]) return porEmail[r.email]; const chave=chaveCrachaData_(r.nomeCracha,r.dataInscricao,r.horaInscricao); if (chave && porCrachaData[chave]) return porCrachaData[chave]; const nomes=porNome[normalizarComparacao_(r.nome)] || []; return nomes.length === 1 ? nomes[0] : null; }
