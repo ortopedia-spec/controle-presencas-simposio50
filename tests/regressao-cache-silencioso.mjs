@@ -51,7 +51,7 @@ function criarElemento() {
 
 function indice(baseVersion, sufixo = 'A') {
   return {
-    appVersion: '2026.09.12.11',
+    appVersion: '2026.09.14.2',
     baseVersion,
     pessoas: [{ idPessoa: `P-${sufixo}`, nome: `Pessoa ${sufixo}`, nomeCracha: '', nomeExibicao: `Pessoa ${sufixo}` }],
     inscricaoParaPessoa: { [`100${sufixo}`]: { idPessoa: `P-${sufixo}`, categoria: 'TESTE' } }
@@ -62,7 +62,7 @@ function criarHarness({ baseVersion = 'N', fresh = indice('N+1', 'B'), random = 
   const timers = criarTimers();
   const storage = new Map();
   const calls = [];
-  const elementos = Object.fromEntries(['scannerStage', 'stop', 'searchBtn', 'search', 'matches', 'feedback', 'status'].map(id => [id, criarElemento()]));
+  const elementos = Object.fromEntries(['scannerStage', 'stop', 'searchBtn', 'search', 'matches', 'feedback', 'status', 'refreshBase'].map(id => [id, criarElemento()]));
   const math = Object.create(Math);
   math.random = () => random;
   class FakeDate extends Date { static now() { return timers.now; } }
@@ -93,11 +93,11 @@ function criarHarness({ baseVersion = 'N', fresh = indice('N+1', 'B'), random = 
     api=(action,body)=>globalThis.apiHandler_(action,body);
     globalThis.cacheExports_={
       APP_VERSION,CACHE_KEY,ID_KEY,BACKGROUND_REFRESH_OPERATION_LIMIT,BACKGROUND_REFRESH_INTERVAL_MS,BACKGROUND_REFRESH_JITTER_MAX_MS,
-      reiniciarJanelaVerificacaoBase_,registrarOperacaoConcluida_,solicitarAtualizacaoSilenciosa_,executarAtualizacaoSilenciosa_,estadoSincronizacaoSilenciosa_,
+      reiniciarJanelaVerificacaoBase_,registrarOperacaoConcluida_,solicitarAtualizacaoSilenciosa_,executarAtualizacaoSilenciosa_,atualizarBaseManual_,estadoSincronizacaoSilenciosa_,
       register,search,indiceCompativel,
       setLocalIndex:value=>{localIndex=value},getLocalIndex:()=>localIndex,
       setApi:handler=>{api=handler},setIdentity:value=>{identity=value},
-      resetState:()=>{operationsSinceVersionCheck=0;lastBaseVersionCheckAt=Date.now();isBackgroundRefreshRunning=false;isBackgroundRefreshScheduled=false;backgroundRefreshTimer=null;backgroundRefreshJitterTimer=null}
+      resetState:()=>{operationsSinceVersionCheck=0;lastBaseVersionCheckAt=Date.now();isBackgroundRefreshRunning=false;isBackgroundRefreshScheduled=false;backgroundRefreshTimer=null;backgroundRefreshJitterTimer=null;backgroundRefreshPromise=null;manualRefreshPromise=null}
     };`, context);
   return { context, app: context.cacheExports_, timers, storage, calls, elementos };
 }
@@ -198,11 +198,11 @@ function criarHarness({ baseVersion = 'N', fresh = indice('N+1', 'B'), random = 
     return new Promise(resolve => { liberar = () => resolve({ baseVersion: 'N' }); });
   });
   const first = h.app.executarAtualizacaoSilenciosa_('teste');
-  const second = await h.app.executarAtualizacaoSilenciosa_('teste');
-  assert.equal(second.iniciada, false, 'refresh em andamento deve recusar outro refresh');
+  const secondPromise = h.app.executarAtualizacaoSilenciosa_('teste');
   assert.equal(h.calls.length, 1);
   liberar();
-  await first;
+  const [firstResult, secondResult] = await Promise.all([first, secondPromise]);
+  assert.equal(firstResult, secondResult, 'refresh em andamento deve compartilhar o mesmo resultado');
 }
 
 {
@@ -247,4 +247,75 @@ assert.match(html, /finally\{registrarOperacaoConcluida_\(\)\}/, 'toda tentativa
 assert.match(html, /BACKGROUND_REFRESH_OPERATION_LIMIT=15/);
 assert.match(html, /BACKGROUND_REFRESH_INTERVAL_MS=5\*60\*1000/);
 assert.match(html, /BACKGROUND_REFRESH_JITTER_MAX_MS=2000/);
+assert.match(html, /\['NETWORK_ERROR','HTTP_ERROR','PARSE_ERROR'\]/, 'retry deve ser restrito a falhas transitórias de leitura');
+assert.match(html, /VERSION_CHECK_FAILED/);
+assert.match(html, /INDEX_DOWNLOAD_FAILED/);
+assert.match(html, /INDEX_INVALID/);
+
+{
+  const h = criarHarness({ baseVersion: 'N' });
+  h.app.setLocalIndex(indice('N'));
+  const resultado = await h.app.atualizarBaseManual_();
+  assert.equal(resultado.atualizada, false);
+  assert.deepEqual(h.calls, ['obterBaseVersion']);
+  assert.equal(h.elementos.status.textContent, 'Base já está atualizada');
+  assert.equal(h.elementos.refreshBase.disabled, false);
+}
+
+{
+  const h = criarHarness({ baseVersion: 'N+1' });
+  h.app.setLocalIndex(indice('N'));
+  const resultado = await h.app.atualizarBaseManual_();
+  assert.equal(resultado.atualizada, true);
+  assert.equal(h.elementos.status.textContent, 'Base atualizada');
+  assert.equal(h.app.estadoSincronizacaoSilenciosa_().operationsSinceVersionCheck, 0);
+}
+
+{
+  const h = criarHarness({ baseVersion: 'N' });
+  h.app.setLocalIndex(indice('N'));
+  h.app.solicitarAtualizacaoSilenciosa_('operacoes');
+  assert.equal(h.app.estadoSincronizacaoSilenciosa_().isBackgroundRefreshScheduled, true);
+  const resultado = await h.app.atualizarBaseManual_();
+  assert.equal(resultado.atualizada, false);
+  assert.deepEqual(h.calls, ['obterBaseVersion'], 'manual deve cancelar o jitter e iniciar imediatamente uma única consulta');
+  assert.equal(h.app.estadoSincronizacaoSilenciosa_().isBackgroundRefreshScheduled, false);
+}
+
+{
+  const h = criarHarness({ baseVersion: 'N' });
+  h.app.setLocalIndex(indice('N'));
+  let liberar;
+  h.app.setApi(action => {
+    h.calls.push(action);
+    return new Promise(resolve => { liberar = () => resolve({ baseVersion: 'N' }); });
+  });
+  const primeiro = h.app.atualizarBaseManual_();
+  const segundo = h.app.atualizarBaseManual_();
+  assert.equal(h.calls.length, 1, 'clique duplo não pode duplicar a consulta');
+  liberar();
+  const [a, b] = await Promise.all([primeiro, segundo]);
+  assert.equal(a, b);
+}
+
+{
+  const h = criarHarness();
+  const antigo = indice('N');
+  h.app.setLocalIndex(antigo);
+  let tentativas = 0;
+  h.app.setApi(async action => {
+    h.calls.push(action); tentativas++;
+    const erro = new Error('falha temporária'); erro.code = 'NETWORK_ERROR'; throw erro;
+  });
+  const atualizacao = h.app.atualizarBaseManual_();
+  for (let i = 0; i < 8 && h.timers.pendentes() === 0; i++) await Promise.resolve();
+  assert.ok(h.timers.pendentes() > 0, 'retry deve agendar a espera curta');
+  await h.timers.avancar(300);
+  const resultado = await atualizacao;
+  assert.equal(tentativas, 2, 'falha transitória deve ter somente um retry');
+  assert.equal(resultado.codigo, 'VERSION_CHECK_FAILED');
+  assert.equal(resultado.causa, 'NETWORK_ERROR');
+  assert.equal(h.app.getLocalIndex(), antigo);
+  assert.equal(h.elementos.status.textContent, 'Não foi possível atualizar a base');
+}
 console.log('OK: sincronização silenciosa do cache aprovada');

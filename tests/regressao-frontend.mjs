@@ -44,7 +44,7 @@ const context = {
   document: { getElementById: id => elements[id] || makeElement(), querySelectorAll: selector => selector === '.person-card button' ? resultButtons : [] }
 };
 vm.createContext(context);
-vm.runInContext(`${helpers}; globalThis.exports_={APP_VERSION,CACHE_KEY,ID_KEY,norm,normalizarQrLido,manterFeedbackDuplicado_,register,processQR,search,setOperationalState,estadoOperacionalAtual_,indiceCompativel,filtrarIndiceLocal,buscarComFallback};`, context);
+vm.runInContext(`${helpers}; globalThis.exports_={APP_VERSION,CACHE_KEY,ID_KEY,norm,normalizarQrLido,manterFeedbackDuplicado_,register,processQR,search,renderMatches,setOperationalState,estadoOperacionalAtual_,indiceCompativel,filtrarIndiceLocal,buscarComFallback};`, context);
 const app = context.exports_;
 
 const indice = {
@@ -58,7 +58,7 @@ const indice = {
   inscricaoParaPessoa: { '75817561': { idPessoa: 'P1', categoria: '' } }
 };
 
-assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.12.11');
+assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.14.2');
 assert.equal(app.ID_KEY, 'simposio50.identidade', 'identidade do operador deve permanecer em chave separada');
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Diego Bento').map(p => p.idPessoa), ['P1']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'diego bento').map(p => p.idPessoa), ['P1']);
@@ -230,6 +230,16 @@ assert.equal(app.indiceCompativel({ ...indice, appVersion: '2026.09.11.1' }, '1'
 assert.equal(app.indiceCompativel({ ...indice, baseVersion: '2' }, '1'), false, 'baseVersion divergente deve ser rejeitada');
 assert.equal(app.indiceCompativel({ baseVersion: '1', pessoas: [], inscricaoParaPessoa: {} }, '1'), false, 'cache legado sem metadados deve ser rejeitado');
 assert.equal(app.indiceCompativel({ ...indice, pessoas: [{ idPessoa: 'P1', nome: 'x' }] }, '1'), false, 'cache sem campos de busca deve ser rejeitado');
+
+app.renderMatches([{ idPessoa: 'P1', nome: 'Nome Igual', nomeCracha: '', nomeExibicao: 'Nome Igual' }]);
+assert.match(elements.matches.innerHTML, /person-card-content/);
+assert.doesNotMatch(elements.matches.innerHTML, /<small>/, 'card sem nome secundário não deve criar placeholder');
+app.renderMatches([{ idPessoa: 'P2', nome: 'Nome de Cadastro', nomeCracha: 'Nome Exibido', nomeExibicao: 'Nome Exibido' }]);
+assert.match(elements.matches.innerHTML, /<small>Cadastro: Nome de Cadastro<\/small>/);
+assert.match(html, /\.person-card-content\{min-height:48px;padding-bottom:14px\}/, 'wrapper deve preservar o espaço antes do botão');
+assert.match(html, /overflow-wrap:anywhere/, 'nomes longos devem quebrar sem invadir o botão');
+assert.match(html, /href="\.\/painel\.html" target="_blank" rel="noopener"/);
+assert.match(html, /id="refreshBase"/);
 
 let chamadas = 0;
 const resultadoLocal = await app.buscarComFallback('Cracha', indice, async () => { chamadas++; return []; });

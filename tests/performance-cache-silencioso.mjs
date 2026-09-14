@@ -20,14 +20,14 @@ function elemento() {
 
 function indice(version, device, suffix = 'A') {
   return {
-    appVersion: '2026.09.12.11', baseVersion: version,
+    appVersion: '2026.09.14.2', baseVersion: version,
     pessoas: [{ idPessoa: `P-${device}-${suffix}`, nome: `Pessoa ${device} ${suffix}`, nomeCracha: '', nomeExibicao: `Pessoa ${device} ${suffix}` }],
     inscricaoParaPessoa: { [`7000000${device}`]: { idPessoa: `P-${device}-${suffix}`, categoria: 'TESTE' } }
   };
 }
 
 function dispositivo(numero, { random = numero / 7, version = 'N', fresh = indice('N+1', numero, 'B'), handler } = {}) {
-  const elements = Object.fromEntries(['scannerStage', 'stop', 'searchBtn', 'search', 'matches', 'feedback', 'status'].map(id => [id, elemento()]));
+  const elements = Object.fromEntries(['scannerStage', 'stop', 'searchBtn', 'search', 'matches', 'feedback', 'status', 'refreshBase'].map(id => [id, elemento()]));
   const storage = new Map([['simposio50.identidade', JSON.stringify({ operador: `Operador ${numero}`, dispositivo: `Dispositivo ${numero}` })]]);
   const calls = [];
   const timings = [];
@@ -56,14 +56,14 @@ function dispositivo(numero, { random = numero / 7, version = 'N', fresh = indic
   vm.createContext(context);
   vm.runInContext(`${helpers}; api=(action,body)=>globalThis.apiHandler_(action,body); rearm=()=>setOperationalState('IDLE');
     globalThis.perfExports_={
-      registrarOperacaoConcluida_,solicitarAtualizacaoSilenciosa_,executarAtualizacaoSilenciosa_,estadoSincronizacaoSilenciosa_,
+      APP_VERSION,registrarOperacaoConcluida_,solicitarAtualizacaoSilenciosa_,executarAtualizacaoSilenciosa_,atualizarBaseManual_,estadoSincronizacaoSilenciosa_,
       filtrarIndiceLocal,buscarComFallback,processQR,register,search,estadoOperacionalAtual_,
       setLocalIndex:value=>{localIndex=value},getLocalIndex:()=>localIndex,setApi:fn=>{api=fn},setState:value=>setOperationalState(value)
     };`, context);
   const app = context.perfExports_;
   const initial = indice('N', numero);
   app.setLocalIndex(initial);
-  storage.set(`simposio50.indice.${app.APP_VERSION || '2026.09.12.11'}`, JSON.stringify(initial));
+  storage.set(`simposio50.indice.${app.APP_VERSION || '2026.09.14.2'}`, JSON.stringify(initial));
   return { numero, context, app, storage, calls, timings, elements, initial };
 }
 
@@ -155,7 +155,16 @@ assert.equal(failureResults.filter(result => result.falhou).length, 4);
 assert.ok(failures.every(d => d.app.getLocalIndex() === d.initial), 'todas as falhas devem preservar o índice anterior');
 assert.ok(failures.every(d => !d.app.estadoSincronizacaoSilenciosa_().isBackgroundRefreshRunning));
 
-// Cenário 6: 70 ciclos mistos com um version check temporal por aparelho.
+// Cenário 6: sete cliques manuais simultâneos, incluindo clique duplo em cada aparelho.
+const manual = Array.from({ length: 7 }, (_, i) => dispositivo(i + 1, { version: 'N+1' }));
+const manualResults = await Promise.all(manual.flatMap(d => [d.app.atualizarBaseManual_(), d.app.atualizarBaseManual_()]));
+assert.ok(manualResults.every(result => result.atualizada));
+assert.equal(manual.reduce((n, d) => n + d.calls.filter(c => c.action === 'obterBaseVersion').length, 0), 7);
+assert.equal(manual.reduce((n, d) => n + d.calls.filter(c => c.action === 'obterIndiceParticipantes').length, 0), 7);
+assert.ok(manual.every(d => d.app.getLocalIndex().baseVersion === 'N+1'));
+assert.ok(manual.every(d => !d.app.estadoSincronizacaoSilenciosa_().isBackgroundRefreshRunning));
+
+// Cenário 7: 70 ciclos mistos com um version check temporal por aparelho.
 const stress = Array.from({ length: 7 }, (_, i) => dispositivo(i + 1, { random: i / 6, version: 'N' }));
 const heapBefore = process.memoryUsage().heapUsed;
 const cycleLatencies = [];
@@ -197,6 +206,7 @@ const report = {
   },
   duringUse: { operations: 7, errors: 0, latency: metricas(duringLatencies), oldCacheAvailable: true, atomicSwap: true },
   failures: { simulated: 4, controlled: failureResults.filter(r => r.falhou).length, oldCachePreserved: 7, stuckStates: 0 },
+  manualRefresh: { devices: 7, clicks: 14, versionChecks: 7, indexDownloads: 7, stuckStates: 0, atomicSwap: true },
   stress: {
     cycles: 70, successes: 70 - cycleErrors, errors: cycleErrors,
     latency: metricas(cycleLatencies), versionChecks: 7, indexDownloads: 0,
