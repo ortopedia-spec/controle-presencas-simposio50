@@ -4,6 +4,11 @@ function auditarAtualizacoesImportacaoEvent3() {
   return resultado;
 }
 function repararNomeCrachaMelissaAlonso() { return repararNomeCrachaMelissaAlonso_(); }
+function repararCpfContaminadoP000056() {
+  const resultado=repararCpfContaminadoP000056_();
+  console.log(JSON.stringify(resultado,null,2));
+  return resultado;
+}
 
 function auditarAtualizacoesImportacaoEvent3_() {
   const participantes=lerTabela_(CONFIG.SHEETS.PARTICIPANTES),inscricoes=lerTabela_(CONFIG.SHEETS.INSCRICOES),importacoes=lerTabela_(CONFIG.SHEETS.IMPORTACOES);
@@ -22,4 +27,36 @@ function repararNomeCrachaMelissaAlonso_() {
   const lock=LockService.getScriptLock();let reparada=false,versao=obterBaseVersion_();
   try{if(!lock.tryLock(30000))throw criarErro_('SISTEMA_OCUPADO','Há uma operação em andamento.');const participantes=lerTabela_(CONFIG.SHEETS.PARTICIPANTES),inscricoes=lerTabela_(CONFIG.SHEETS.INSCRICOES);validarCabecalho_(participantes.headers,CONFIG.HEADERS.PARTICIPANTES,CONFIG.SHEETS.PARTICIPANTES);validarCabecalho_(inscricoes.headers,CONFIG.HEADERS.INSCRICOES,CONFIG.SHEETS.INSCRICOES);const indice=participantes.rows.findIndex(function(p){return texto_(p.ID_PESSOA)==='P000056';});if(indice===-1)throw criarErro_('PESSOA_NAO_ENCONTRADA','P000056 não encontrada.');const pessoa=participantes.rows[indice];if(normalizarComparacao_(pessoa.NOME)!=='MELISSA ALONSO')throw criarErro_('REPARO_INTERROMPIDO','P000056 não corresponde ao caso confirmado.');const origemConfiavel=inscricoes.rows.filter(function(i){return texto_(i.ID_PESSOA)==='P000056';}).some(function(i){return texto_(i.NOME_CRACHA_ORIGEM);});if(origemConfiavel)throw criarErro_('REPARO_INTERROMPIDO','Há nome de crachá de origem preenchido; revisão manual necessária.');if(texto_(pessoa.NOME_CRACHA)!=='Simone Anselmo')return{reparada:false,idPessoa:'P000056',baseVersion:versao};const coluna=CONFIG.HEADERS.PARTICIPANTES.indexOf('NOME_CRACHA')+1;participantes.sheet.getRange(indice+2,coluna).setValue('');versao=incrementarBaseVersion_();reparada=true;}finally{if(lock.hasLock())lock.releaseLock();}
   if(reparada)aquecerCacheBaseSeguro_();return{reparada:reparada,idPessoa:'P000056',baseVersion:versao};
+}
+
+function repararCpfContaminadoP000056_() {
+  const lock=LockService.getScriptLock();let reparada=false,versao=obterBaseVersion_(),resultado=null;
+  try {
+    if(!lock.tryLock(30000))throw criarErro_('SISTEMA_OCUPADO','Há uma operação em andamento.');
+    const participantes=lerTabela_(CONFIG.SHEETS.PARTICIPANTES),inscricoes=lerTabela_(CONFIG.SHEETS.INSCRICOES);
+    validarCabecalho_(participantes.headers,CONFIG.HEADERS.PARTICIPANTES,CONFIG.SHEETS.PARTICIPANTES);
+    validarCabecalho_(inscricoes.headers,CONFIG.HEADERS.INSCRICOES,CONFIG.SHEETS.INSCRICOES);
+    const indiceAlvo=participantes.rows.findIndex(function(p){return texto_(p.ID_PESSOA)==='P000056';}),pessoaLegitima=participantes.rows.find(function(p){return texto_(p.ID_PESSOA)==='P000348';});
+    if(indiceAlvo===-1||!pessoaLegitima)throw criarErro_('REPARO_INTERROMPIDO','Os participantes guardados não foram encontrados.');
+    const pessoaAlvo=participantes.rows[indiceAlvo];
+    if(normalizarComparacao_(pessoaAlvo.NOME)!=='MELISSA ALONSO')throw criarErro_('REPARO_INTERROMPIDO','P000056 não corresponde ao caso confirmado.');
+    const cpf=somenteDigitos_(pessoaAlvo.CPF);
+    if(!cpf)return{reparada:false,jaEstavaVazio:true,guardasConfirmadas:true,cpfRemovido:true,p000348Preservado:true,baseVersion:versao};
+    if(!nomesClaramenteDiferentes_(pessoaAlvo.NOME,pessoaLegitima.NOME))throw criarErro_('REPARO_INTERROMPIDO','Os nomes das pessoas guardadas não são inequivocamente diferentes.');
+    const emailAlvo=normalizarEmail_(pessoaAlvo.EMAIL),emailLegitimo=normalizarEmail_(pessoaLegitima.EMAIL);
+    if(!emailAlvo||!emailLegitimo||emailAlvo===emailLegitimo)throw criarErro_('REPARO_INTERROMPIDO','Os e-mails das pessoas guardadas não sustentam a separação esperada.');
+    if(somenteDigitos_(pessoaLegitima.CPF)!==cpf)throw criarErro_('REPARO_INTERROMPIDO','P000348 não possui o CPF canônico esperado.');
+    const origensAlvo=inscricoes.rows.filter(function(i){return texto_(i.ID_PESSOA)==='P000056';}),origensLegitimas=inscricoes.rows.filter(function(i){return texto_(i.ID_PESSOA)==='P000348';});
+    if(!origensAlvo.length||origensAlvo.some(function(i){return somenteDigitos_(i.CPF_ORIGEM)===cpf;}))throw criarErro_('REPARO_INTERROMPIDO','Uma origem de P000056 sustenta o CPF; revisão manual necessária.');
+    if(!origensLegitimas.some(function(i){return somenteDigitos_(i.CPF_ORIGEM)===cpf;}))throw criarErro_('REPARO_INTERROMPIDO','Nenhuma origem de P000348 sustenta o CPF.');
+    const idsComCpf=participantes.rows.filter(function(p){return somenteDigitos_(p.CPF)===cpf;}).map(function(p){return texto_(p.ID_PESSOA);}).sort();
+    if(idsComCpf.join('|')!=='P000056|P000348')throw criarErro_('REPARO_INTERROMPIDO','O CPF aparece em participantes fora do caso estritamente autorizado.');
+    const colunaCpf=CONFIG.HEADERS.PARTICIPANTES.indexOf('CPF')+1;
+    if(colunaCpf<1)throw criarErro_('REPARO_INTERROMPIDO','A coluna CPF não foi localizada.');
+    participantes.sheet.getRange(indiceAlvo+2,colunaCpf).setValue('');
+    versao=incrementarBaseVersion_();reparada=true;
+    resultado={reparada:true,jaEstavaVazio:false,guardasConfirmadas:true,cpfRemovido:true,p000348Preservado:true,baseVersion:versao};
+  } finally { if(lock.hasLock())lock.releaseLock(); }
+  if(reparada)aquecerCacheBaseSeguro_();
+  return resultado;
 }
