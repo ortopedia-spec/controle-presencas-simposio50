@@ -4,7 +4,7 @@ function importarCredenciamento_(payload) {
   if (!tokenEsperado || tokenRecebido !== tokenEsperado) throw criarErro_('NAO_AUTORIZADO', 'Token de importação inválido.');
   const registros = Array.isArray(payload.registros) ? payload.registros : Array.isArray(payload.inscricoes) ? payload.inscricoes : Array.isArray(payload.dados) ? payload.dados : [];
   if (!registros.length) throw criarErro_('IMPORTACAO_VAZIA', 'Nenhum registro foi enviado.');
-  const lock = LockService.getScriptLock();
+  const lock = LockService.getScriptLock(); let resultado, aquecerCache=false;
   try {
     if (!lock.tryLock(30000)) throw criarErro_('SISTEMA_OCUPADO', 'Há uma importação ou presença em andamento.');
     const participantes = lerTabela_(CONFIG.SHEETS.PARTICIPANTES), inscricoes = lerTabela_(CONFIG.SHEETS.INSCRICOES);
@@ -52,13 +52,17 @@ function importarCredenciamento_(payload) {
     Object.keys(alteradas).forEach(function(id) { const p=alteradas[id]; if (p.__linha) participantes.sheet.getRange(p.__linha,1,1,CONFIG.HEADERS.PARTICIPANTES.length).setValues([linhaPessoa_(p)]); });
     if (linhasInscricao.length) inscricoes.sheet.getRange(inscricoes.sheet.getLastRow()+1,1,linhasInscricao.length,CONFIG.HEADERS.INSCRICOES.length).setValues(linhasInscricao);
     pessoasAtualizadas = Object.keys(alteradas).filter(id => alteradas[id].__linha).length;
-    const versao = (novasInscricoes || Object.keys(alteradas).length) ? incrementarBaseVersion_() : obterBaseVersion_();
+    const houveAlteracao=novasInscricoes || Object.keys(alteradas).length;
+    const versao = houveAlteracao ? incrementarBaseVersion_() : obterBaseVersion_();
     registrarImportacao_(payload, registros.length, novasInscricoes, pessoasNovas, pessoasAtualizadas, 'SUCESSO', 'Importação concluída. Base ' + versao + '.');
-    return { arquivo: texto_(payload.arquivo), registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
+    resultado={ arquivo: texto_(payload.arquivo), registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
+    aquecerCache=Boolean(houveAlteracao);
   } catch (erro) {
     registrarImportacaoSeguro_(payload, registros.length, 0, 0, 0, 'ERRO', erro.message);
     throw erro;
   } finally { if (lock.hasLock()) lock.releaseLock(); }
+  if(aquecerCache)aquecerCacheBaseSeguro_();
+  return resultado;
 }
 
 function normalizarRegistroImportado_(r,payload) { return { numeroInscricao: normalizarNumeroInscricao_(campo_(r,['numeroInscricao','NUMERO_INSCRICAO','inscricao'])), idOrigem: texto_(campo_(r,['idOrigem','ID_ORIGEM'])), nome: texto_(campo_(r,['nome','NOME_ORIGEM','NOME'])), nomeCracha: texto_(campo_(r,['nomeCracha','NOME_CRACHA_ORIGEM','NOME_CRACHA'])), email: normalizarEmail_(campo_(r,['email','EMAIL_ORIGEM','EMAIL'])), cpf: somenteDigitos_(campo_(r,['cpf','CPF_ORIGEM','CPF'])), telefone: texto_(campo_(r,['telefone','TELEFONE'])), categoria: texto_(campo_(r,['categoria','CATEGORIA'])), dataInscricao: texto_(campo_(r,['dataInscricao','DATA_INSCRICAO'])), horaInscricao: texto_(campo_(r,['horaInscricao','HORA_INSCRICAO'])), arquivoOrigem: texto_(campo_(r,['arquivoOrigem','ARQUIVO_ORIGEM','arquivo']) || payload.arquivo) }; }

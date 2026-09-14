@@ -21,6 +21,7 @@ function bucketCache_(valor) { let h=0,s=texto_(valor);for(let i=0;i<s.length;i+
 function chavesCacheVersao_(versao) { const chaves=[chaveCache_(versao,'META','0')];for(let i=0;i<CACHE_BUCKETS;i++){chaves.push(chaveCache_(versao,'PESSOA',i));chaves.push(chaveCache_(versao,'QR',i));}return chaves; }
 function invalidarCacheDaVersao_(versao) { CacheService.getScriptCache().removeAll(chavesCacheVersao_(versao)); }
 function invalidarIndice_() { invalidarCacheDaVersao_(obterBaseVersion_()); }
+function aquecerCacheBaseSeguro_() { try { return garantirCacheBase_(); } catch (erro) { console.warn('[CACHE_WARM_FAILED] '+texto_(erro&&erro.message)); return ''; } }
 
 function garantirCacheBase_() {
   const versao=obterBaseVersion_(),cache=CacheService.getScriptCache(),meta=chaveCache_(versao,'META','0');

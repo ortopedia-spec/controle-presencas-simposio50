@@ -20,7 +20,7 @@ function elemento() {
 
 function indice(version, device, suffix = 'A') {
   return {
-    appVersion: '2026.09.14.2', baseVersion: version,
+    appVersion: '2026.09.14.3', baseVersion: version,
     pessoas: [{ idPessoa: `P-${device}-${suffix}`, nome: `Pessoa ${device} ${suffix}`, nomeCracha: '', nomeExibicao: `Pessoa ${device} ${suffix}` }],
     inscricaoParaPessoa: { [`7000000${device}`]: { idPessoa: `P-${device}-${suffix}`, categoria: 'TESTE' } }
   };
@@ -63,7 +63,7 @@ function dispositivo(numero, { random = numero / 7, version = 'N', fresh = indic
   const app = context.perfExports_;
   const initial = indice('N', numero);
   app.setLocalIndex(initial);
-  storage.set(`simposio50.indice.${app.APP_VERSION || '2026.09.14.2'}`, JSON.stringify(initial));
+  storage.set(`simposio50.indice.${app.APP_VERSION || '2026.09.14.3'}`, JSON.stringify(initial));
   return { numero, context, app, storage, calls, timings, elements, initial };
 }
 

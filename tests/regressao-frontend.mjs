@@ -58,7 +58,7 @@ const indice = {
   inscricaoParaPessoa: { '75817561': { idPessoa: 'P1', categoria: '' } }
 };
 
-assert.equal(app.CACHE_KEY, 'simposio50.indice.2026.09.14.2');
+assert.equal(app.CACHE_KEY, 'simposio50.indice');
 assert.equal(app.ID_KEY, 'simposio50.identidade', 'identidade do operador deve permanecer em chave separada');
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Diego Bento').map(p => p.idPessoa), ['P1']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'diego bento').map(p => p.idPessoa), ['P1']);

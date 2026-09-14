@@ -43,6 +43,8 @@ assert.equal(api.completarPessoa_(reimportada, { nomeCracha: 'Diego Bento', emai
 assert.equal(reimportada.NOME_CRACHA, 'Diego Bento'); assert.equal(reimportada.NUMEROS_INSCRICAO, oito.join('|')); assert.equal(reimportada.QTD_INSCRICOES, 8);
 assert.match(source, /if \(porInscricao\[r\.numeroInscricao\]\)/, 'QR existente deve seguir o caminho de enriquecimento');
 assert.match(source, /agoraTexto_\(\),'EVENT3'\]/, 'novas importações devem registrar origem EVENT3');
+assert.match(source, /aquecerCache=Boolean\(houveAlteracao\)/, 'somente importação com mudança efetiva deve aquecer o cache');
+assert.match(source, /if\(aquecerCache\)aquecerCacheBaseSeguro_\(\)/, 'aquecimento deve ocorrer após liberar o lock da importação');
 
 assert.match(source, /payload\.arquivoDataHora\|\|payload\.dataHoraArquivo/, 'arquivoDataHora deve ter prioridade no log');
 assert.match(source, /arquivo: texto_\(payload\.arquivo\)/, 'resposta deve preservar arquivo para PowerShell');
@@ -50,6 +52,7 @@ const cache = fs.readFileSync(new URL('../apps-script/Cache.gs', import.meta.url
 assert.match(cache, /const CACHE_BUCKETS = 32/, 'cache deve usar buckets');
 assert.match(cache, /const CACHE_SCHEMA_VERSION = '6'/, 'cache deve versionar o formato serializado');
 assert.match(cache, /invalidarCacheDaVersao_\(anterior\)/, 'versão anterior deve ser invalidada');
+assert.match(cache, /function aquecerCacheBaseSeguro_\(\).*garantirCacheBase_\(\)/, 'aquecimento deve reutilizar a reconstrução segmentada protegida por ScriptLock');
 vm.runInContext(`${cache}; globalThis.cacheExports_={nomeCrachaParaCache_,chaveCache_,textoBuscaPessoa_};`, context);
 assert.equal(context.cacheExports_.nomeCrachaParaCache_('', ['Diego Bento']), 'Diego Bento', 'cache deve usar o único nome de crachá de origem');
 assert.equal(context.cacheExports_.nomeCrachaParaCache_('Cadastro Institucional', ['Diego Bento']), 'Diego Bento', 'origem humana única deve ter prioridade apenas na representação em cache');

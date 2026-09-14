@@ -51,7 +51,7 @@ function criarElemento() {
 
 function indice(baseVersion, sufixo = 'A') {
   return {
-    appVersion: '2026.09.14.2',
+    appVersion: '2026.09.14.3',
     baseVersion,
     pessoas: [{ idPessoa: `P-${sufixo}`, nome: `Pessoa ${sufixo}`, nomeCracha: '', nomeExibicao: `Pessoa ${sufixo}` }],
     inscricaoParaPessoa: { [`100${sufixo}`]: { idPessoa: `P-${sufixo}`, categoria: 'TESTE' } }
@@ -73,7 +73,9 @@ function criarHarness({ baseVersion = 'N', fresh = indice('N+1', 'B'), random = 
     clearTimeout: timers.clearTimeout,
     localStorage: {
       getItem: key => storage.get(key) ?? null,
-      setItem: (key, value) => storage.set(key, value)
+      setItem: (key, value) => storage.set(key, value),
+      key: index => Array.from(storage.keys())[index] ?? null,
+      get length() { return storage.size; }
     },
     document: {
       getElementById: id => elementos[id] || criarElemento(),
@@ -94,7 +96,7 @@ function criarHarness({ baseVersion = 'N', fresh = indice('N+1', 'B'), random = 
     globalThis.cacheExports_={
       APP_VERSION,CACHE_KEY,ID_KEY,BACKGROUND_REFRESH_OPERATION_LIMIT,BACKGROUND_REFRESH_INTERVAL_MS,BACKGROUND_REFRESH_JITTER_MAX_MS,
       reiniciarJanelaVerificacaoBase_,registrarOperacaoConcluida_,solicitarAtualizacaoSilenciosa_,executarAtualizacaoSilenciosa_,atualizarBaseManual_,estadoSincronizacaoSilenciosa_,
-      register,search,indiceCompativel,
+      register,search,indiceCompativel,indiceEstruturalmenteValido_,obterIndiceLocalDisponivel_,loadIndex,
       setLocalIndex:value=>{localIndex=value},getLocalIndex:()=>localIndex,
       setApi:handler=>{api=handler},setIdentity:value=>{identity=value},
       resetState:()=>{operationsSinceVersionCheck=0;lastBaseVersionCheckAt=Date.now();isBackgroundRefreshRunning=false;isBackgroundRefreshScheduled=false;backgroundRefreshTimer=null;backgroundRefreshJitterTimer=null;backgroundRefreshPromise=null;manualRefreshPromise=null}
@@ -317,5 +319,49 @@ assert.match(html, /INDEX_INVALID/);
   assert.equal(resultado.causa, 'NETWORK_ERROR');
   assert.equal(h.app.getLocalIndex(), antigo);
   assert.equal(h.elementos.status.textContent, 'Não foi possível atualizar a base');
+}
+
+{
+  const h = criarHarness({ baseVersion: '2' });
+  const legado = { ...indice('2', 'LEGADO'), appVersion: '2026.09.14.2' };
+  h.storage.set('simposio50.indice.2026.09.14.2', JSON.stringify(legado));
+  await h.app.loadIndex();
+  assert.equal(h.app.getLocalIndex().baseVersion, '2', 'mudança de APP_VERSION deve reaproveitar a base local');
+  assert.equal(h.app.getLocalIndex().appVersion, h.app.APP_VERSION);
+  assert.equal(JSON.parse(h.storage.get(h.app.CACHE_KEY)).baseVersion, '2', 'migração deve gravar a chave estável');
+  assert.equal(h.elementos.status.textContent, 'Base local pronta');
+}
+
+{
+  const h = criarHarness({ baseVersion: '3', fresh: indice('3', 'NOVA') });
+  const legado = { ...indice('2', 'ANTIGA'), appVersion: '2026.09.14.2' };
+  h.storage.set('simposio50.indice.2026.09.14.2', JSON.stringify(legado));
+  await h.app.loadIndex();
+  assert.equal(h.app.getLocalIndex().baseVersion, '2', 'a base antiga deve ficar disponível antes do download');
+  assert.equal(h.elementos.status.textContent, 'Base local disponível; atualizando…');
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+  assert.equal(h.app.getLocalIndex().baseVersion, '3', 'a troca deve ocorrer apenas após validar a nova base');
+  assert.equal(h.elementos.status.textContent, 'Base atualizada');
+  assert.deepEqual(h.calls, ['obterBaseVersion', 'obterBaseVersion', 'obterIndiceParticipantes']);
+}
+
+{
+  const h = criarHarness();
+  const legado = { ...indice('2', 'OFFLINE'), appVersion: '2026.09.14.2' };
+  h.storage.set('simposio50.indice.2026.09.14.2', JSON.stringify(legado));
+  h.app.setApi(async action => { h.calls.push(action); const erro = new Error('servidor indisponível'); erro.code = 'NETWORK_ERROR'; throw erro; });
+  const abertura = h.app.loadIndex();
+  for (let i = 0; i < 8 && h.timers.pendentes() === 0; i++) await Promise.resolve();
+  await h.timers.avancar(300);
+  await abertura;
+  assert.equal(h.app.getLocalIndex().baseVersion, '2', 'falha do servidor não pode descartar cache utilizável');
+  assert.equal(h.elementos.status.textContent, 'Usando base local; servidor temporariamente indisponível');
+}
+
+{
+  const h = criarHarness({ baseVersion: '3', fresh: indice('3', 'PRIMEIRA') });
+  await h.app.loadIndex();
+  assert.equal(h.app.getLocalIndex().baseVersion, '3', 'sem cache, a base atual deve ser baixada normalmente');
+  assert.equal(h.elementos.status.textContent, 'Base atualizada');
 }
 console.log('OK: sincronização silenciosa do cache aprovada');
