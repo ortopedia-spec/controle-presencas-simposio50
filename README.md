@@ -5,6 +5,8 @@ Aplicação mobile-first para credenciamento rápido em **15 e 16 de setembro de
 ## Componentes
 
 - **GitHub Pages:** interface estática, scanner contínuo com `html5-qrcode`, busca manual, cache sanitizado no navegador e atualização por `version.json`.
+- **Painel:** `painel.html` consulta somente agregados, atualiza a cada 10 segundos e usa cache de servidor de 5 segundos.
+- **Inscrição local:** Google Forms mantém a resposta bruta e um trigger instalável integra a inscrição à mesma base canônica.
 - **Google Apps Script:** API HTTP (`doPost`) e decisão final de presença.
 - **Google Sheets:** base operacional existente.
 
@@ -32,6 +34,8 @@ Veja [DEPLOY.md](docs/DEPLOY.md) antes de substituir código em produção. `Imp
 ## Atualizações
 
 Altere `APP_VERSION` em `index.html` e `version.json` juntos. Na abertura, a página consulta o JSON sem cache e recarrega uma vez com `?v=` ao detectar uma versão publicada diferente.
+
+O painel possui versionamento independente no próprio `painel.html`; a tela operacional estável permanece congelada em `2026.09.12.11`.
 
 ## Testes
 

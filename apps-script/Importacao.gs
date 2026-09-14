@@ -44,7 +44,7 @@ function importarCredenciamento_(payload) {
       const numeros = numerosInscricaoUnicos_(texto_(pessoa.NUMEROS_INSCRICAO).split(/[|,;\s]+/).filter(Boolean).concat([r.numeroInscricao]));
       pessoa.NUMEROS_INSCRICAO = numeros.join('|'); pessoa.QTD_INSCRICOES = numeros.length; pessoa.ULTIMA_ATUALIZACAO = agoraTexto_();
       alteradas[pessoa.ID_PESSOA] = pessoa;
-      linhasInscricao.push([r.numeroInscricao,pessoa.ID_PESSOA,r.idOrigem,r.nome,r.nomeCracha,r.email,r.cpf,r.categoria,r.dataInscricao,r.horaInscricao,r.arquivoOrigem,agoraTexto_()]);
+      linhasInscricao.push([r.numeroInscricao,pessoa.ID_PESSOA,r.idOrigem,r.nome,r.nomeCracha,r.email,r.cpf,r.categoria,r.dataInscricao,r.horaInscricao,r.arquivoOrigem,agoraTexto_(),'EVENT3']);
       porInscricao[r.numeroInscricao] = {idPessoa:pessoa.ID_PESSOA}; novasInscricoes++;
     });
     const novasPessoas = pessoas.filter(p => !p.__linha);

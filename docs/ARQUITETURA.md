@@ -9,3 +9,7 @@ O Apps Script forma um índice sanitizado por `BASE_VERSION`: pessoas e `NUMERO_
 O browser guarda a mesma visão sanitizada em `localStorage`. Na carga, pede somente `obterBaseVersion`; se a versão coincidir, usa o índice local. Essa visão nunca decide a duplicidade: `registrarPresenca` sempre consulta e grava no servidor, dentro de `LockService`.
 
 O importador PowerShell permanece externo e chama `importarCredenciamento` com `token`, `arquivo`, `arquivoDataHora` e `registros`. Durante a migração, o token é buscado primeiro em Script Properties e, se ausente, na chave `TOKEN_IMPORTACAO` da aba `CONFIG`; ele nunca é retornado ao browser. A importação deduplica por `NUMERO_INSCRICAO`, preserva `NUMEROS_INSCRICAO` canônico com `|`, completa dados vazios da pessoa canônica sem substituir informação boa por vazio e, ao terminar, chama `incrementarBaseVersion_()`.
+
+`painel.html` chama somente `obterPainel`. O Apps Script calcula totais e percentuais no servidor, sem retornar linhas, nomes, CPF, e-mail ou telefone, e mantém o agregado no `CacheService` por 5 segundos.
+
+O credenciamento presencial segue `Google Forms → resposta RAW → trigger onFormSubmit → validação/deduplicação → PARTICIPANTES/INSCRICOES → BASE_VERSION`. O `responseId` e o namespace `LOCAL-` tornam o processamento idempotente. Nome isolado nunca é usado para unir pessoas.

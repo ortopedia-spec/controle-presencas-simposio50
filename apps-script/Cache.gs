@@ -4,11 +4,15 @@ const CACHE_BUCKETS = 32;
 const CACHE_SCHEMA_VERSION = '6';
 
 function obterBaseVersion_() { return PropertiesService.getScriptProperties().getProperty('BASE_VERSION') || '1'; }
-function incrementarBaseVersion_() {
+function incrementarBaseVersion_(chaveIdempotencia) {
+  const propriedades = PropertiesService.getScriptProperties();
+  const marcador = chaveIdempotencia ? 'BASE_VERSION_APLICADA_' + hashCurto_(chaveIdempotencia, 32) : '';
+  if (marcador && propriedades.getProperty(marcador)) { invalidarCacheDaVersao_(obterBaseVersion_()); return obterBaseVersion_(); }
   const anterior = obterBaseVersion_();
   invalidarCacheDaVersao_(anterior);
   const proxima = String(Number(anterior) + 1);
-  PropertiesService.getScriptProperties().setProperty('BASE_VERSION', proxima);
+  if (marcador) { const alteracoes={ BASE_VERSION: proxima };alteracoes[marcador]=proxima;propriedades.setProperties(alteracoes,false); }
+  else propriedades.setProperty('BASE_VERSION', proxima);
   invalidarCacheDaVersao_(proxima);
   return proxima;
 }
@@ -43,3 +47,4 @@ function nomeCrachaParaCache_(canonico,valoresOrigem) {
   return valorOrigem||texto_(canonico);
 }
 function textoBuscaPessoa_(nome,nomeNormalizado,nomeCracha,nomesCrachaOrigem) { return normalizarComparacao_([nome,nomeNormalizado,nomeCracha].concat(nomesCrachaOrigem||[]).join(' ')); }
+function hashCurto_(valor,tamanho) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,texto_(valor),Utilities.Charset.UTF_8).map(function(byte){return ('0'+((byte+256)%256).toString(16)).slice(-2);}).join('').slice(0,tamanho||24).toUpperCase(); }

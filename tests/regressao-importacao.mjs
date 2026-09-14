@@ -42,6 +42,7 @@ const reimportada = { NOME: 'Ortopedia SORRI', NOME_CRACHA: '', EMAIL: '', CPF: 
 assert.equal(api.completarPessoa_(reimportada, { nomeCracha: 'Diego Bento', email: '', cpf: '', telefone: '' }), true);
 assert.equal(reimportada.NOME_CRACHA, 'Diego Bento'); assert.equal(reimportada.NUMEROS_INSCRICAO, oito.join('|')); assert.equal(reimportada.QTD_INSCRICOES, 8);
 assert.match(source, /if \(porInscricao\[r\.numeroInscricao\]\)/, 'QR existente deve seguir o caminho de enriquecimento');
+assert.match(source, /agoraTexto_\(\),'EVENT3'\]/, 'novas importações devem registrar origem EVENT3');
 
 assert.match(source, /payload\.arquivoDataHora\|\|payload\.dataHoraArquivo/, 'arquivoDataHora deve ter prioridade no log');
 assert.match(source, /arquivo: texto_\(payload\.arquivo\)/, 'resposta deve preservar arquivo para PowerShell');

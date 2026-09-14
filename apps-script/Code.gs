@@ -11,6 +11,7 @@ function doPost(e) {
       case 'obterindiceparticipantes': data = obterIndiceParticipantes_(); break;
       case 'buscarparticipantes': data = buscarParticipantes_(payload.termo); break;
       case 'buscarporinscricao': data = buscarPorInscricao_(payload.numeroInscricao); break;
+      case 'obterpainel': data = obterPainel_(payload.data, payload.periodo); break;
       case 'registrarpresenca': data = registrarPresenca_(payload); break;
       case 'importarcredenciamento': data = importarCredenciamento_(payload); break;
       default: throw criarErro_('ACAO_INVALIDA', 'Ação não reconhecida.');
@@ -34,3 +35,4 @@ function linhaComoObjeto_(headers, values) { return headers.reduce(function(o, h
 function spreadsheet_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
 function sheetObrigatoria_(nome) { const sh = spreadsheet_().getSheetByName(nome); if (!sh) throw criarErro_('ABA_NAO_ENCONTRADA', 'A aba obrigatória não existe: ' + nome); return sh; }
 function lerTabela_(nome) { const sh = sheetObrigatoria_(nome); const values = sh.getDataRange().getDisplayValues(); if (!values.length) return { sheet: sh, headers: [], rows: [] }; return { sheet: sh, headers: values[0].map(texto_), rows: values.slice(1).filter(r => r.some(v => texto_(v))).map(r => linhaComoObjeto_(values[0], r)) }; }
+function obterConfiguracaoValor_(chave) { const valores=sheetObrigatoria_(CONFIG.SHEETS.CONFIG).getDataRange().getDisplayValues(),alvo=normalizarComparacao_(chave);for(let i=0;i<valores.length;i++)if(normalizarComparacao_(valores[i][0])===alvo)return texto_(valores[i].slice(1).find(texto_));return ''; }
