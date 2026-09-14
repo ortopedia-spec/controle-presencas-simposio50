@@ -1,4 +1,8 @@
-function auditarAtualizacoesImportacaoEvent3() { return auditarAtualizacoesImportacaoEvent3_(); }
+function auditarAtualizacoesImportacaoEvent3() {
+  const resultado=auditarAtualizacoesImportacaoEvent3_();
+  console.log(JSON.stringify(resultado,null,2));
+  return resultado;
+}
 function repararNomeCrachaMelissaAlonso() { return repararNomeCrachaMelissaAlonso_(); }
 
 function auditarAtualizacoesImportacaoEvent3_() {
