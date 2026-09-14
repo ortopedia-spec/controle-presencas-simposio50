@@ -1,3 +1,6 @@
+function auditarAtualizacoesImportacaoEvent3() { return auditarAtualizacoesImportacaoEvent3_(); }
+function repararNomeCrachaMelissaAlonso() { return repararNomeCrachaMelissaAlonso_(); }
+
 function auditarAtualizacoesImportacaoEvent3_() {
   const participantes=lerTabela_(CONFIG.SHEETS.PARTICIPANTES),inscricoes=lerTabela_(CONFIG.SHEETS.INSCRICOES),importacoes=lerTabela_(CONFIG.SHEETS.IMPORTACOES);
   validarCabecalho_(participantes.headers,CONFIG.HEADERS.PARTICIPANTES,CONFIG.SHEETS.PARTICIPANTES);validarCabecalho_(inscricoes.headers,CONFIG.HEADERS.INSCRICOES,CONFIG.SHEETS.INSCRICOES);validarCabecalho_(importacoes.headers,CONFIG.HEADERS.IMPORTACOES,CONFIG.SHEETS.IMPORTACOES);

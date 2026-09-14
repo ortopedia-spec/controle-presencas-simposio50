@@ -64,6 +64,8 @@ assert.match(cache, /invalidarCacheDaVersao_\(anterior\)/, 'versão anterior dev
 assert.match(cache, /function aquecerCacheBaseSeguro_\(\).*garantirCacheBase_\(\)/, 'aquecimento deve reutilizar a reconstrução segmentada protegida por ScriptLock');
 const auditoria = fs.readFileSync(new URL('../apps-script/AuditoriaImportacao.gs', import.meta.url), 'utf8');
 assert.match(auditoria, /function auditarAtualizacoesImportacaoEvent3_\(\)/, 'auditoria deve ser somente leitura');
+assert.match(auditoria, /function auditarAtualizacoesImportacaoEvent3\(\)/, 'auditoria deve ter wrapper público no editor Apps Script');
+assert.match(auditoria, /function repararNomeCrachaMelissaAlonso\(\)/, 'reparo deve ter wrapper público no editor Apps Script');
 assert.match(auditoria, /PESSOAS_NOVAS/, 'auditoria deve excluir pessoas novas da importação analisada');
 assert.match(auditoria, /slice\(0,16\)/, 'auditoria deve tolerar segundos diferentes entre atualização e log');
 assert.match(auditoria, /P000056/, 'reparo deve ser estritamente limitado ao ID confirmado');
