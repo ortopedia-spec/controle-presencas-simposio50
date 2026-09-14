@@ -51,9 +51,9 @@ const indice = {
   appVersion: app.APP_VERSION,
   baseVersion: '1',
   pessoas: [
-    { idPessoa: 'P1', nome: 'Cadastro Institucional', nomeCracha: 'Diego Bento', nomeExibicao: 'Diego Bento' },
-    { idPessoa: 'P3', nome: 'Cadastro Alternativo', nomeCracha: 'Crachá Árvore', nomeExibicao: 'Crachá Árvore' },
-    { idPessoa: 'P2', nome: 'Nome Principal', nomeCracha: '', nomeExibicao: 'Nome Principal' }
+    { idPessoa: 'P1', nome: 'Cadastro Institucional', nomeCracha: 'Diego Bento', nomeExibicao: 'Diego Bento', nomesBusca: ['Diego Bento'] },
+    { idPessoa: 'P3', nome: 'Cadastro Alternativo', nomeCracha: 'Crachá Árvore', nomeExibicao: 'Crachá Árvore', nomesBusca: ['Crachá Árvore'] },
+    { idPessoa: 'P2', nome: 'Nome Principal', nomeCracha: '', nomeExibicao: 'Nome Principal', nomesBusca: ['Nome Principal'] }
   ],
   inscricaoParaPessoa: { '75817561': { idPessoa: 'P1', categoria: '' } }
 };
@@ -67,6 +67,8 @@ assert.deepEqual(app.filtrarIndiceLocal(indice, 'Diego').map(p => p.idPessoa), [
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Bento').map(p => p.idPessoa), ['P1']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Cracha Arvore').map(p => p.idPessoa), ['P3']);
 assert.deepEqual(app.filtrarIndiceLocal(indice, 'Nome Principal').map(p => p.idPessoa), ['P2']);
+const indiceComAliasDeOrigem={...indice,pessoas:[{idPessoa:'P7',nome:'Cadastro Institucional',nomeCracha:'',nomeExibicao:'Cadastro Institucional',nomesBusca:['Diego Bento']}]};
+assert.deepEqual(app.filtrarIndiceLocal(indiceComAliasDeOrigem, 'Diego Bento').map(p => p.idPessoa), ['P7'], 'busca local deve localizar nome de crachá de origem');
 assert.equal(app.norm('  Árvore  CAFÉ '), 'ARVORE CAFE', 'normalização deve ignorar acentos e espaços extras');
 assert.equal(app.normalizarQrLido('  00012345\n'), '00012345', 'QR numérico simples deve preservar zeros à esquerda');
 assert.equal(app.normalizarQrLido('https://e3.gl/99a0046e75817561?n=Ortopedia'), '75817561', 'URL QR confirmada deve extrair somente a inscrição');
@@ -212,7 +214,7 @@ assert.equal(app.estadoOperacionalAtual_(), 'IDLE');
 const botaoBuscaLocal = makeElement();
 resultButtons.push(botaoBuscaLocal);
 vm.runInContext(`
-  localIndex = { appVersion: APP_VERSION, baseVersion: '1', pessoas: [{ idPessoa: 'PL', nome: 'Melissa', nomeCracha: '', nomeExibicao: 'Melissa' }], inscricaoParaPessoa: {} };
+  localIndex = { appVersion: APP_VERSION, baseVersion: '1', pessoas: [{ idPessoa: 'PL', nome: 'Melissa', nomeCracha: '', nomeExibicao: 'Melissa', nomesBusca: ['Melissa'] }], inscricaoParaPessoa: {} };
   scanning = true;
   setOperationalState('SCANNING');
   document.getElementById('search').value = 'Melissa';

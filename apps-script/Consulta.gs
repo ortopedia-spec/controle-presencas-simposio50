@@ -5,9 +5,9 @@ function buscarPorInscricao_(numeroInscricao) {
   return sanitizarPessoa_(obterPessoaCache_(match.idPessoa), numero, match.categoria);
 }
 function buscarParticipantes_(termo) {
-  const q = normalizarComparacao_(termo); if (q.length < 2) throw criarErro_('BUSCA_CURTA', 'Digite ao menos 2 caracteres.');
+  const q = normalizarComparacao_(termo),cpf=somenteDigitos_(termo); if (q.length < 2) throw criarErro_('BUSCA_CURTA', 'Digite ao menos 2 caracteres.');
   const partes = q.split(' '), indice = obterIndiceInterno_();
-  const encontrados = Object.keys(indice.pessoas).map(id => indice.pessoas[id]).filter(p => partes.every(t => p.busca.indexOf(t) !== -1)).slice(0, CONFIG.MAX_SEARCH_RESULTS);
+  const encontrados = Object.keys(indice.pessoas).map(id => indice.pessoas[id]).filter(p => cpf.length===11?(p.cpfsBusca||[]).indexOf(cpf)!==-1:partes.every(t => p.busca.indexOf(t) !== -1)).slice(0, CONFIG.MAX_SEARCH_RESULTS);
   return { baseVersion: indice.baseVersion, participantes: encontrados.map(p => sanitizarPessoa_(p, '', '', nomeExibicaoPesquisa_(p, partes))) };
 }
 function nomeExibicaoPesquisa_(pessoa, partes) {
