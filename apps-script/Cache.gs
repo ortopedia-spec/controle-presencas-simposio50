@@ -13,9 +13,11 @@ function inscricaoEvent3Conflitante_(numero) { return obterConflitosIdentidadeEv
 function idOrigemEvent3Conflitante_(idOrigem) { return obterConflitosIdentidadeEvent3_().idsOrigem.indexOf(texto_(idOrigem)) !== -1; }
 function registrarConflitoIdentidadeEvent3_(numero, idOrigem) {
   const atual = obterConflitosIdentidadeEvent3_(), n = normalizarNumeroInscricao_(numero), i = texto_(idOrigem);
-  if (n && atual.numerosInscricao.indexOf(n) === -1) atual.numerosInscricao.push(n);
-  if (i && atual.idsOrigem.indexOf(i) === -1) atual.idsOrigem.push(i);
+  let mudou = false;
+  if (n && atual.numerosInscricao.indexOf(n) === -1) { atual.numerosInscricao.push(n); mudou = true; }
+  if (i && atual.idsOrigem.indexOf(i) === -1) { atual.idsOrigem.push(i); mudou = true; }
   PropertiesService.getScriptProperties().setProperty('CONFLITOS_IDENTIDADE_EVENT3', JSON.stringify(atual));
+  return mudou;
 }
 
 function obterBaseVersion_() { return PropertiesService.getScriptProperties().getProperty('BASE_VERSION') || '1'; }

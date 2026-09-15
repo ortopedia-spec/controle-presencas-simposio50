@@ -14,6 +14,7 @@ function doPost(e) {
       case 'obterpainel': data = obterPainel_(payload.data, payload.periodo); break;
       case 'registrarpresenca': data = registrarPresenca_(payload); break;
       case 'importarcredenciamento': data = importarCredenciamento_(payload); break;
+      case 'aplicarcontencaoconflitoseventv': if (texto_(payload.tokenImportacao || payload.TOKEN_IMPORTACAO || payload.token) !== obterTokenImportacao_()) throw criarErro_('NAO_AUTORIZADO', 'Token de importação inválido.'); data = aplicarContencaoConflitosEvent3V1(); break;
       default: throw criarErro_('ACAO_INVALIDA', 'Ação não reconhecida.');
     }
     return respostaJson_({ ok: true, data: data });

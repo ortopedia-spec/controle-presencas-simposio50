@@ -23,7 +23,7 @@ function importarCredenciamento_(payload) {
       const chave = chaveCrachaData_(i.NOME_CRACHA_ORIGEM, i.DATA_INSCRICAO, i.HORA_INSCRICAO);
       if (chave && pessoas.find(p => texto_(p.ID_PESSOA) === texto_(i.ID_PESSOA))) porCrachaData[chave] = pessoas.find(p => texto_(p.ID_PESSOA) === texto_(i.ID_PESSOA));
     });
-    let novasInscricoes = 0, pessoasNovas = 0, pessoasAtualizadas = 0, conflitosIdentidade = 0, proximo = proximoIdPessoa_(pessoas);
+    let novasInscricoes = 0, pessoasNovas = 0, pessoasAtualizadas = 0, conflitosIdentidade = 0, conflitosNovos = 0, proximo = proximoIdPessoa_(pessoas);
     const linhasInscricao = [], alteradas = {};
     registros.forEach(function(registro) {
       const r = normalizarRegistroImportado_(registro, payload);
@@ -32,7 +32,7 @@ function importarCredenciamento_(payload) {
         // Reimportação: pode enriquecer campos canônicos, mas não cria inscrição nem altera contadores.
         const pessoaExistente=pessoas.find(p => texto_(p.ID_PESSOA)===porInscricao[r.numeroInscricao].idPessoa);
         if (pessoaExistente && identidadeCompativelParaEnriquecimento_(pessoaExistente,r)) { if(completarPessoa_(pessoaExistente,r)) { pessoaExistente.ULTIMA_ATUALIZACAO=agoraTexto_();alteradas[pessoaExistente.ID_PESSOA]=pessoaExistente; } }
-        else if(pessoaExistente){conflitosIdentidade++;registrarConflitoIdentidadeEvent3_(r.numeroInscricao,r.idOrigem);console.warn('[IMPORTACAO_IDENTIDADE_DIVERGENTE] '+texto_(pessoaExistente.ID_PESSOA));const nomeNovo=normalizarComparacao_(r.nome),jaExiste=pessoas.find(function(p){return normalizarComparacao_(p.NOME)===nomeNovo;});if(!jaExiste&&r.nome){const shell={ID_PESSOA:'P'+String(proximo++).padStart(6,'0'),NOME:r.nome,NOME_NORMALIZADO:nomeNovo,NOME_CRACHA:'',EMAIL:'',CPF:'',TELEFONE:'',NUMEROS_INSCRICAO:'',QTD_INSCRICOES:0,PRIMEIRA_INSCRICAO_EM:r.dataInscricao+' '+r.horaInscricao,ULTIMA_ATUALIZACAO:agoraTexto_(),__linha:0};pessoas.push(shell);pessoasNovas++;porNome[nomeNovo]=porNome[nomeNovo]||[];porNome[nomeNovo].push(shell);}}
+        else if(pessoaExistente){conflitosIdentidade++;if(registrarConflitoIdentidadeEvent3_(r.numeroInscricao,r.idOrigem))conflitosNovos++;console.warn('[IMPORTACAO_IDENTIDADE_DIVERGENTE] '+texto_(pessoaExistente.ID_PESSOA));const nomeNovo=normalizarComparacao_(r.nome),jaExiste=pessoas.find(function(p){return normalizarComparacao_(p.NOME)===nomeNovo;});if(!jaExiste&&r.nome){const shell={ID_PESSOA:'P'+String(proximo++).padStart(6,'0'),NOME:r.nome,NOME_NORMALIZADO:nomeNovo,NOME_CRACHA:'',EMAIL:'',CPF:'',TELEFONE:'',NUMEROS_INSCRICAO:'',QTD_INSCRICOES:0,PRIMEIRA_INSCRICAO_EM:r.dataInscricao+' '+r.horaInscricao,ULTIMA_ATUALIZACAO:agoraTexto_(),__linha:0};pessoas.push(shell);pessoasNovas++;porNome[nomeNovo]=porNome[nomeNovo]||[];porNome[nomeNovo].push(shell);}}
         return;
       }
       let pessoa = localizarPessoaConservadora_(r, porCpf, porEmail, porNome, porCrachaData);
@@ -53,7 +53,7 @@ function importarCredenciamento_(payload) {
     Object.keys(alteradas).forEach(function(id) { const p=alteradas[id]; if (p.__linha) participantes.sheet.getRange(p.__linha,1,1,CONFIG.HEADERS.PARTICIPANTES.length).setValues([linhaPessoa_(p)]); });
     if (linhasInscricao.length) inscricoes.sheet.getRange(inscricoes.sheet.getLastRow()+1,1,linhasInscricao.length,CONFIG.HEADERS.INSCRICOES.length).setValues(linhasInscricao);
     pessoasAtualizadas = Object.keys(alteradas).filter(id => alteradas[id].__linha).length;
-    const houveAlteracao=novasInscricoes || Object.keys(alteradas).length;
+    const houveAlteracao=novasInscricoes || pessoasNovas > 0 || Object.keys(alteradas).length || conflitosNovos > 0;
     const versao = houveAlteracao ? incrementarBaseVersion_() : obterBaseVersion_();
     registrarImportacao_(payload, registros.length, novasInscricoes, pessoasNovas, pessoasAtualizadas, 'SUCESSO', 'Importação concluída. Base ' + versao + '. Conflitos de identidade ignorados: '+conflitosIdentidade+'.');
     resultado={ arquivo: texto_(payload.arquivo), registrosLidos: registros.length, inscricoesNovas: novasInscricoes, pessoasNovas: pessoasNovas, pessoasAtualizadas: pessoasAtualizadas, baseVersion: versao };
