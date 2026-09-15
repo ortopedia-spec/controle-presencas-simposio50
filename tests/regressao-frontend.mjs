@@ -96,26 +96,19 @@ resultButtons.length = 0;
 
 vm.runInContext(`
   globalThis.apiActions_ = [];
-  globalThis.lookupResolve_ = null;
   api = async action => {
     globalThis.apiActions_.push(action);
-    if (action === 'buscarPorInscricao') return new Promise(resolve => { globalThis.lookupResolve_ = resolve; });
     return { status: 'REGISTRADA', participante: { nomeExibicao: 'Pessoa teste' }, presenca: { data: '01/01', hora: '10:00', periodo: 'MANHA' } };
   };
+  localIndex={appVersion:APP_VERSION,baseVersion:'1',pessoas:[{idPessoa:'P1',nome:'Cadastro Institucional',nomeCracha:'Diego Bento',nomeExibicao:'Diego Bento',nomesBusca:['Diego Bento']}],inscricaoParaPessoa:{'75817561':{idPessoa:'P1',categoria:''}}};
   rearm = () => setOperationalState(scanning ? 'SCANNING' : 'IDLE');
 `, context);
-const primeiraLeitura = app.processQR('00012346');
-assert.equal(app.estadoOperacionalAtual_(), 'PROCESSING_QR', 'decode deve entrar em processamento sem aguardar servidor');
-assert.equal(elements.scannerStage.attributes['aria-busy'], 'true');
-assert.match(elements.stop.innerHTML, /spinner[\s\S]*Consultando…/, 'consulta QR deve exibir spinner imediatamente');
-await app.processQR('00012346');
-assert.equal(context.apiActions_.join(','), 'buscarPorInscricao', 'mesmo QR repetido não pode gerar outra consulta');
-context.lookupResolve_({ idPessoa: 'P1', nomeExibicao: 'Pessoa teste' });
-await primeiraLeitura;
-assert.equal(app.estadoOperacionalAtual_(), 'SCANNING', 'loader deve terminar quando consulta conclui');
+await app.processQR('75817561');
+assert.equal(context.apiActions_.join(','), 'registrarPresenca', 'QR conhecido consulta somente o registro de presença');
+assert.equal(app.estadoOperacionalAtual_(), 'SCANNING', 'QR local deve liberar o scanner após concluir');
 assert.equal(elements.stop.innerHTML, '■ Parar câmera');
 
-vm.runInContext(`api = async () => { throw new Error('falha QR simulada'); }; rearm = () => setOperationalState('SCANNING');`, context);
+vm.runInContext(`api = async () => { throw new Error('QR desconhecido não pode chamar servidor'); }; rearm = () => setOperationalState('SCANNING');`, context);
 await app.processQR('00012347');
 assert.equal(app.estadoOperacionalAtual_(), 'SCANNING', 'erro de QR deve liberar o scanner novamente');
 assert.equal(elements.stop.innerHTML, '■ Parar câmera', 'erro de QR deve encerrar o loader');
@@ -182,25 +175,16 @@ vm.runInContext(`
   setOperationalState('IDLE');
   document.getElementById('search').value = 'Nome teste';
   globalThis.searchCalls_ = 0;
-  globalThis.searchResolve_ = null;
-  api = async action => {
-    if (action !== 'buscarParticipantes') throw new Error('ação inesperada');
-    globalThis.searchCalls_++;
-    return new Promise(resolve => { globalThis.searchResolve_ = resolve; });
-  };
+  localIndex = { appVersion: APP_VERSION, baseVersion: '1', pessoas: [{ idPessoa: 'P9', nome: 'Nome teste', nomeCracha: '', nomeExibicao: 'Nome teste', nomesBusca: ['Nome teste'] }], inscricaoParaPessoa: {} };
+  api = async () => { globalThis.searchCalls_++; throw new Error('busca não pode chamar servidor'); };
 `, context);
-const primeiraBusca = app.search();
-assert.equal(app.estadoOperacionalAtual_(), 'SEARCHING');
-assert.equal(elements.searchBtn.disabled, true, 'botão deve ser desabilitado durante busca');
-assert.equal(elements.searchBtn.attributes['aria-busy'], 'true');
-assert.match(elements.searchBtn.innerHTML, /spinner[\s\S]*Buscando…/);
-await app.search();
-assert.equal(context.searchCalls_, 1, 'clique ou Enter repetido não pode iniciar outra busca');
 const botaoNovoResultado = makeElement();
 resultButtons.push(botaoNovoResultado);
-context.searchResolve_({ participantes: [{ idPessoa: 'P9', nome: 'Cadastro teste', nomeExibicao: 'Nome teste' }] });
+const primeiraBusca = app.search();
+assert.equal(app.estadoOperacionalAtual_(), 'IDLE', 'busca local deve concluir sem aguardar servidor');
 await primeiraBusca;
-assert.equal(elements.searchBtn.disabled, false, 'botão deve ser restaurado após resultado');
+assert.equal(context.searchCalls_, 0, 'busca não pode consultar servidor');
+assert.equal(elements.searchBtn.disabled, false, 'botão deve permanecer disponível após resultado local');
 assert.equal(elements.searchBtn.innerHTML, 'Buscar');
 assert.equal(botaoNovoResultado.disabled, false, 'resultado criado dinamicamente deve sair habilitado');
 assert.equal(typeof botaoNovoResultado.onclick, 'function', 'resultado de busca deve receber ação de registro');
@@ -221,7 +205,7 @@ vm.runInContext(`
   api = async () => { throw new Error('busca local não deve acessar servidor'); };
 `, context);
 const buscaLocalRapida = app.search();
-assert.equal(app.estadoOperacionalAtual_(), 'SEARCHING', 'busca local rápida também deve mostrar estado imediato');
+assert.equal(app.estadoOperacionalAtual_(), 'SCANNING', 'busca local rápida deve devolver imediatamente o scanner');
 await buscaLocalRapida;
 assert.equal(app.estadoOperacionalAtual_(), 'SCANNING', 'busca manual com scanner ativo deve retornar ao scanner');
 assert.equal(botaoBuscaLocal.disabled, false, 'scanner ativo não pode bloquear o registro do resultado manual');
@@ -244,10 +228,10 @@ assert.match(html, /href="\.\/painel\.html" target="_blank" rel="noopener"/);
 assert.match(html, /id="refreshBase"/);
 
 let chamadas = 0;
-const resultadoLocal = await app.buscarComFallback('Cracha', indice, async () => { chamadas++; return []; });
+const resultadoLocal = await app.buscarComFallback('Cracha', indice);
 assert.equal(resultadoLocal.length, 1);
 assert.equal(chamadas, 0, 'resultado local não deve consultar o backend');
-const resultadoFallback = await app.buscarComFallback('Inexistente', indice, async () => { chamadas++; return [{ idPessoa: 'PX' }]; });
-assert.equal(resultadoFallback.length, 1);
-assert.equal(chamadas, 1, 'zero resultados locais deve consultar o backend');
+const resultadoFallback = await app.buscarComFallback('Inexistente', indice);
+assert.equal(resultadoFallback.length, 0);
+assert.equal(chamadas, 0, 'zero resultados locais não pode consultar o backend');
 console.log('OK: regressões de cache e busca do frontend aprovadas');
