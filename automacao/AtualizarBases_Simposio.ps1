@@ -18,6 +18,8 @@ try {
 }
 catch {
     $codigo = if ($_.Exception.Message -eq 'AUTOMACAO_AUSENTE') { 'AUTOMACAO_AUSENTE' } else { 'ORQUESTRADOR_ERRO' }
-    try { Add-Content -LiteralPath $log -Encoding UTF8 -Value ('{0} | ERRO | codigo={1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $codigo) } catch {}
+    $tipo = $_.Exception.GetType().Name
+    $linha = $_.InvocationInfo.ScriptLineNumber
+    try { Add-Content -LiteralPath $log -Encoding UTF8 -Value ('{0} | ERRO | codigo={1} | tipo={2} | linha={3}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $codigo, $tipo, $linha) } catch {}
     [pscustomobject]@{ status='ERRO'; codigo=$codigo; mensagem='Não foi possível atualizar. Consulte o log.' }
 }
