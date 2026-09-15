@@ -21,9 +21,9 @@
 </main>
 <div class="overlay hidden" id="identity"><div class="modal"><h2>Identificação</h2><p>Informe uma vez para este aparelho.</p><label for="operatorInput">Operador</label><input id="operatorInput" maxlength="80" autocomplete="name"><label for="deviceInput">Dispositivo</label><input id="deviceInput" maxlength="80" placeholder="Ex.: Celular 01"><button id="saveIdentity">Continuar</button></div></div>
 <script>
-  const API_URL='https://script.google.com/macros/s/AKfycbywaWPGmfLXDxlZkgQzw3AGW3K5UX9SaxjOBrzfCJtnBDUKtlr3haF5HBhCDBXHSqH7/exec';
-  const APP_VERSION='2026.09.15.1', CACHE_KEY='simposio50.indice', LEGACY_CACHE_PREFIX='simposio50.indice.', ID_KEY='simposio50.identidade', QR_COOLDOWN_MS=2600;
-  const BACKGROUND_REFRESH_OPERATION_LIMIT=15, BACKGROUND_REFRESH_INTERVAL_MS=5*60*1000, BACKGROUND_REFRESH_JITTER_MAX_MS=2000;
+  const API_URL='https://script.google.com/macros/s/AKfycbyr6Uu1NE2M6UE3i2X92qNQgih3Ky9OCAYpXqmo3L2fGry2GhIGVPn43mDOp_IFd1Cl/exec';
+  const APP_VERSION='2026.09.15.2', CACHE_KEY='simposio50.indice', LEGACY_CACHE_PREFIX='simposio50.indice.', ID_KEY='simposio50.identidade', QR_COOLDOWN_MS=2600;
+  const BACKGROUND_REFRESH_OPERATION_LIMIT=15, BACKGROUND_REFRESH_INTERVAL_MS=10000, BACKGROUND_REFRESH_JITTER_MAX_MS=3000;
   const BUSY_STATES=new Set(['QR_DETECTED','PROCESSING_QR','SEARCHING','PROCESSING_RESULT']);
   let scanner=null, scanning=false, busy=false, operationState='IDLE', lastQrPayload='', lastQrSeenAt=0, feedbackTimer=null, identity={}, localIndex=null;
   let operationsSinceVersionCheck=0, lastBaseVersionCheckAt=Date.now(), backgroundRefreshTimer=null, backgroundRefreshJitterTimer=null, isBackgroundRefreshRunning=false, isBackgroundRefreshScheduled=false, backgroundRefreshPromise=null, manualRefreshPromise=null;

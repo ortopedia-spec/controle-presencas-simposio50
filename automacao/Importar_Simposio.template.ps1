@@ -19,7 +19,7 @@ $FalhaImportacao = $null
 
 $PastaInput = "C:\UNIMED_EXAMES_ABERTOS"
 
-$WebAppUrl = "https://script.google.com/macros/s/AKfycbywaWPGmfLXDxlZkgQzw3AGW3K5UX9SaxjOBrzfCJtnBDUKtlr3haF5HBhCDBXHSqH7/exec"
+$WebAppUrl = "https://script.google.com/macros/s/AKfycbyr6Uu1NE2M6UE3i2X92qNQgih3Ky9OCAYpXqmo3L2fGry2GhIGVPn43mDOp_IFd1Cl/exec"
 
 # COLE ABAIXO O TOKEN QUE ESTA NA ABA CONFIG DA PLANILHA
 $Token = "COLE_AQUI_O_TOKEN_IMPORTACAO"
