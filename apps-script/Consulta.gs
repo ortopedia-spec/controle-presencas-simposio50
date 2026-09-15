@@ -1,5 +1,6 @@
 function buscarPorInscricao_(numeroInscricao) {
   const numero = normalizarNumeroInscricao_(numeroInscricao); if (!numero) throw criarErro_('INSCRICAO_OBRIGATORIA', 'Informe o número de inscrição.');
+  if (inscricaoEvent3Conflitante_(numero)) throw criarErro_('CONFLITO_IDENTIDADE_EVENT3', 'Cadastro com divergência na origem. Localize o participante pelo nome.');
   const match = obterQrCache_(numero);
   if (!match) throw criarErro_('QR_NAO_LOCALIZADO', 'QR não localizado.');
   return sanitizarPessoa_(obterPessoaCache_(match.idPessoa), numero, match.categoria);

@@ -3,6 +3,21 @@ const CACHE_BUCKETS = 32;
 // Altere quando o conteúdo serializado do cache mudar. Isso evita reutilizar buckets legados.
 const CACHE_SCHEMA_VERSION = '7';
 
+function obterConflitosIdentidadeEvent3_() {
+  const bruto = PropertiesService.getScriptProperties().getProperty('CONFLITOS_IDENTIDADE_EVENT3');
+  if (!bruto) return { numerosInscricao: [], idsOrigem: [] };
+  try { const v = JSON.parse(bruto); return { numerosInscricao: v.numerosInscricao || [], idsOrigem: v.idsOrigem || [] }; }
+  catch (_) { return { numerosInscricao: [], idsOrigem: [] }; }
+}
+function inscricaoEvent3Conflitante_(numero) { return obterConflitosIdentidadeEvent3_().numerosInscricao.indexOf(normalizarNumeroInscricao_(numero)) !== -1; }
+function idOrigemEvent3Conflitante_(idOrigem) { return obterConflitosIdentidadeEvent3_().idsOrigem.indexOf(texto_(idOrigem)) !== -1; }
+function registrarConflitoIdentidadeEvent3_(numero, idOrigem) {
+  const atual = obterConflitosIdentidadeEvent3_(), n = normalizarNumeroInscricao_(numero), i = texto_(idOrigem);
+  if (n && atual.numerosInscricao.indexOf(n) === -1) atual.numerosInscricao.push(n);
+  if (i && atual.idsOrigem.indexOf(i) === -1) atual.idsOrigem.push(i);
+  PropertiesService.getScriptProperties().setProperty('CONFLITOS_IDENTIDADE_EVENT3', JSON.stringify(atual));
+}
+
 function obterBaseVersion_() { return PropertiesService.getScriptProperties().getProperty('BASE_VERSION') || '1'; }
 function incrementarBaseVersion_(chaveIdempotencia) {
   const propriedades = PropertiesService.getScriptProperties();
@@ -31,7 +46,7 @@ function garantirCacheBase_() {
     lock.waitLock(20000); if(cache.get(meta))return versao;
     const pessoasBuckets=Array.from({length:CACHE_BUCKETS},()=>({})),qrBuckets=Array.from({length:CACHE_BUCKETS},()=>({})),crachaPorPessoa={},cpfPorPessoa={};
     const inscricoes=lerTabela_(CONFIG.SHEETS.INSCRICOES).rows;
-    inscricoes.forEach(function(i){const id=texto_(i.ID_PESSOA);if(id){crachaPorPessoa[id]=crachaPorPessoa[id]||[];crachaPorPessoa[id].push(texto_(i.NOME_CRACHA_ORIGEM));cpfPorPessoa[id]=cpfPorPessoa[id]||[];cpfPorPessoa[id].push(somenteDigitos_(i.CPF_ORIGEM));}const numero=normalizarNumeroInscricao_(i.NUMERO_INSCRICAO);if(numero)qrBuckets[bucketCache_(numero)][numero]={idPessoa:id,categoria:texto_(i.CATEGORIA)};});
+    inscricoes.forEach(function(i){const id=texto_(i.ID_PESSOA),numero=normalizarNumeroInscricao_(i.NUMERO_INSCRICAO),conflito=inscricaoEvent3Conflitante_(numero)||idOrigemEvent3Conflitante_(i.ID_ORIGEM);if(id&&!conflito){crachaPorPessoa[id]=crachaPorPessoa[id]||[];crachaPorPessoa[id].push(texto_(i.NOME_CRACHA_ORIGEM));cpfPorPessoa[id]=cpfPorPessoa[id]||[];cpfPorPessoa[id].push(somenteDigitos_(i.CPF_ORIGEM));}if(numero&&!conflito)qrBuckets[bucketCache_(numero)][numero]={idPessoa:id,categoria:texto_(i.CATEGORIA)};});
     lerTabela_(CONFIG.SHEETS.PARTICIPANTES).rows.forEach(function(p){const id=texto_(p.ID_PESSOA);if(!id)return;const nome=texto_(p.NOME),nomesCrachaOrigem=crachaPorPessoa[id]||[],nomeCracha=nomeCrachaParaCache_(texto_(p.NOME_CRACHA),nomesCrachaOrigem);pessoasBuckets[bucketCache_(id)][id]={idPessoa:id,nome:nome,nomeCracha:nomeCracha,nomeExibicao:nomeCracha||nome,nomesCrachaOrigem:nomesCrachaOrigem,cpfsBusca:cpfsBuscaPessoa_(p.CPF,cpfPorPessoa[id]||[]),qtdInscricoes:Number(p.QTD_INSCRICOES)||0,busca:textoBuscaPessoa_(nome,p.NOME_NORMALIZADO,nomeCracha,nomesCrachaOrigem)};});
     for(let i=0;i<CACHE_BUCKETS;i++){cache.put(chaveCache_(versao,'PESSOA',i),JSON.stringify(pessoasBuckets[i]),CONFIG.CACHE_SECONDS);cache.put(chaveCache_(versao,'QR',i),JSON.stringify(qrBuckets[i]),CONFIG.CACHE_SECONDS);}
     cache.put(meta,JSON.stringify({versao:versao,buckets:CACHE_BUCKETS}),CONFIG.CACHE_SECONDS); return versao;
